@@ -59,6 +59,9 @@ export function dbToLifeOS(
         calories: row.calories,
         protein: row.protein,
       },
+      finance: {
+        amount: null,
+      },
       todos: [],
     };
   }
