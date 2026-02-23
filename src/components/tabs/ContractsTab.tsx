@@ -80,9 +80,9 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
       <TerminalCard title="STRENGTH (3 sessions)">
         <div className="flex flex-col gap-3 mt-2">
           {([
-            ["armsChest", "Arms / Chest"],
+            ["armsChest", "Arms"],
             ["legs", "Legs"],
-            ["coreBack", "Core / Back"],
+            ["coreBack", "Core / Back / Chest"],
           ] as const).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2.5 cursor-pointer">
               <input
