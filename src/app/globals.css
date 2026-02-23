@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* ============================================
+   TAILWIND THEME EXTENSION
+
+   This defines custom colors and fonts that Tailwind
+   can use as utility classes. For example:
+   - text-terminal     -> color: #20c20e
+   - bg-terminal-bg    -> background: #0a0f0a
+   - border-terminal-border -> border-color: #1a3a1a
+   ============================================ */
+@theme inline {
+  --color-terminal: #20c20e;
+  --color-terminal-bright: #40ff40;
+  --color-terminal-dim: #156315;
+  --color-terminal-bg: #0a0f0a;
+  --color-terminal-surface: #080c08;
+  --color-terminal-border: #1a3a1a;
+  --color-terminal-warning: #c2c20e;
+  --color-terminal-danger: #ff4444;
+  --color-terminal-card: rgba(32, 194, 14, 0.05);
+  --color-terminal-card-highlight: rgba(32, 194, 14, 0.1);
+  --color-terminal-active: rgba(32, 194, 14, 0.15);
+  --font-mono: "Courier New", monospace;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-terminal-bg);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   CRT MONITOR EFFECT (Fallout-style)
+
+   Creates an ambient phosphor glow across the entire
+   screen, simulating an old CRT monitor.
+   ============================================ */
+
+/* Outer vignette - darker corners like a curved CRT */
+#terminal-frame {
+  box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.7),
+              inset 0 0 80px rgba(0, 0, 0, 0.5);
+}
+
+/* Scanlines overlay */
+#terminal-frame::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.12),
+    rgba(0, 0, 0, 0.12) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Ambient green phosphor glow + subtle flicker */
+#terminal-frame::after {
+  content: "";
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(32, 194, 14, 0.03) 0%,
+    rgba(32, 194, 14, 0.015) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 999;
+  animation: crt-glow 4s ease-in-out infinite;
+}
+
+@keyframes crt-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.02);
+  }
+}
+
+/* Subtle screen flicker effect */
+@keyframes flicker {
+  0% { opacity: 0.98; }
+  5% { opacity: 1; }
+  10% { opacity: 0.97; }
+  15% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* ============================================
+   FORM ELEMENTS
+
+   Styled to match the terminal aesthetic.
+   Using base CSS instead of Tailwind for form
+   elements keeps the markup cleaner.
+   ============================================ */
+input[type="number"],
+input[type="text"],
+input[type="date"] {
+  background: var(--color-terminal-surface);
+  border: 1px solid var(--color-terminal-border);
+  color: var(--color-terminal);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  width: 100%;
+  margin: 4px 0;
+  border-radius: 4px;
+  min-height: 44px;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--color-terminal);
+  box-shadow: 0 0 10px rgba(32, 194, 14, 0.3);
+}
+
+input::placeholder {
+  color: var(--color-terminal-dim);
+}
+
+textarea {
+  background: var(--color-terminal-surface);
+  border: 1px solid var(--color-terminal-border);
+  color: var(--color-terminal);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  border-radius: 4px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--color-terminal);
+  box-shadow: 0 0 10px rgba(32, 194, 14, 0.3);
+}
+
+textarea::placeholder {
+  color: var(--color-terminal-dim);
+}
+
+input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  accent-color: var(--color-terminal);
+}
+
+/* Scrollbar hiding for the tab menu */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
