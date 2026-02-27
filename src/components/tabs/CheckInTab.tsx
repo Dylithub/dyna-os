@@ -75,19 +75,6 @@ export default function CheckInTab({ data, update }: CheckInTabProps) {
           </div>
         ))}
 
-        <div className="mt-4">
-          <label className="text-terminal-dim text-[11px] block mb-1 tracking-wider">
-            NOTE (OPTIONAL)
-          </label>
-          <textarea
-            placeholder="Anything on your mind?"
-            value={noteValue}
-            onChange={(e) => setNoteValue(e.target.value)}
-          />
-          <div className="mt-2">
-            <TerminalButton onClick={saveNote}>SAVE NOTE</TerminalButton>
-          </div>
-        </div>
       </TerminalCard>
 
       {checkIn?.mood !== null && checkIn?.mood !== undefined && (
