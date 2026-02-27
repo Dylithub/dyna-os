@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import type { LifeOS } from "@/lib/types";
 import { getTodayKey } from "@/lib/dates";
@@ -12,6 +12,51 @@ import TerminalButton from "@/components/TerminalButton";
 interface SettingsTabProps {
   data: LifeOS;
   update: (updater: (current: LifeOS) => LifeOS) => void;
+}
+
+// Number input that allows empty during editing, saves on blur
+function NumberInput({
+  value,
+  onChange,
+  className,
+  min,
+  max,
+}: {
+  value: number;
+  onChange: (val: number) => void;
+  className?: string;
+  min?: number;
+  max?: number;
+}) {
+  const [localValue, setLocalValue] = useState<string>(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Sync local value when external value changes (but not while focused)
+  const lastValue = useRef(value);
+  if (value !== lastValue.current && !isFocused) {
+    setLocalValue(String(value));
+    lastValue.current = value;
+  }
+
+  return (
+    <input
+      type="number"
+      value={isFocused ? localValue : String(value)}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={() => {
+        setIsFocused(true);
+        setLocalValue(String(value));
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        const num = parseInt(localValue) || 0;
+        onChange(num);
+      }}
+      className={className}
+      min={min}
+      max={max}
+    />
+  );
 }
 
 export default function SettingsTab({ data, update }: SettingsTabProps) {
@@ -132,19 +177,17 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">CALORIES (kcal)</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.calorieTarget}
-              onChange={(e) => updateSetting("calorieTarget", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("calorieTarget", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">PROTEIN (g)</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.proteinTarget}
-              onChange={(e) => updateSetting("proteinTarget", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("proteinTarget", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
@@ -154,10 +197,9 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">TARGET (lb)</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.targetWeight}
-              onChange={(e) => updateSetting("targetWeight", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("targetWeight", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
@@ -176,19 +218,17 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">WEEKDAY ($)</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.weekdaySpendTarget}
-              onChange={(e) => updateSetting("weekdaySpendTarget", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("weekdaySpendTarget", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">WEEKEND ($)</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.weekendSpendTarget}
-              onChange={(e) => updateSetting("weekendSpendTarget", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("weekendSpendTarget", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
@@ -198,31 +238,28 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">ZONE 2 #</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.zone2Sessions}
-              onChange={(e) => updateSetting("zone2Sessions", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("zone2Sessions", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">ZONE 2 MIN</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.zone2Minutes}
-              onChange={(e) => updateSetting("zone2Minutes", parseInt(e.target.value) || 0)}
+              onChange={(val) => updateSetting("zone2Minutes", val)}
               className="!p-2 !text-xs w-full"
             />
           </div>
           <div>
             <label className="text-terminal-dim text-[10px] block mb-1">STRENGTH #</label>
-            <input
-              type="number"
+            <NumberInput
               value={settings.strengthSessions}
-              onChange={(e) => handleStrengthSessionsChange(parseInt(e.target.value) || 0)}
+              onChange={(val) => handleStrengthSessionsChange(val)}
               className="!p-2 !text-xs w-full"
-              min="0"
-              max="10"
+              min={0}
+              max={10}
             />
           </div>
         </div>
