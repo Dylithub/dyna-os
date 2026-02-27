@@ -45,7 +45,7 @@ export default function InstallPrompt() {
   return (
     <div className="fixed bottom-16 left-4 right-4 border border-terminal-border bg-terminal-surface p-3 z-[600] flex items-center justify-between gap-2">
       <span className="text-terminal text-xs tracking-wider">
-        {">"} INSTALL DYNA OS
+        {">"} INSTALL DYNA OPTICS
       </span>
       <div className="flex gap-2 shrink-0">
         <button

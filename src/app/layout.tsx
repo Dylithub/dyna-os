@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DYNA OS",
-  description: "Fitness Terminal v2.0",
+  title: "DYNA OPTICS",
+  description: "Lifestyle OS",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "DYNA OS",
+    title: "DYNA OPTICS",
   },
 };
 

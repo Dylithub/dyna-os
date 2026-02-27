@@ -1,7 +1,7 @@
 {
-  "name": "DYNA OS - Fitness Terminal",
-  "short_name": "DYNA OS",
-  "description": "Terminal-style fitness tracker",
+  "name": "DYNA OPTICS - Lifestyle OS",
+  "short_name": "DYNA OPTICS",
+  "description": "Terminal-style lifestyle tracker",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0f0a",

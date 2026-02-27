@@ -8,10 +8,10 @@ export default function LoginPage() {
     >
       <header className="px-5 py-4 border-b border-terminal-border bg-terminal-surface">
         <div className="text-terminal text-base tracking-widest">
-          DYNA OS
+          DYNA OPTICS
         </div>
         <div className="text-terminal-dim text-[10px] mt-0.5 tracking-wider">
-          FITNESS TERMINAL v2.0
+          LIFESTYLE OS
         </div>
       </header>
 
