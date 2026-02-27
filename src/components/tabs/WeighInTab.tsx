@@ -48,38 +48,51 @@ function formatWeekLabel(weekKey: string): string {
   return monthInitial;
 }
 
-// Generate labels - sequential 1-4 per month, cycling through months
-// Simple approach: start with first week's month, then just cycle 1-4 and advance month every 4 weeks
+// Generate labels based on actual calendar position of each week's Thursday
+// Week 1 = days 1-7, Week 2 = days 8-14, Week 3 = days 15-21, Week 4 = days 22-31
 function generateWeekLabels(weekKeys: string[]): string[] {
-  if (weekKeys.length === 0) return [];
-
   const monthInitials = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
-
-  // Get starting month from first week's Thursday
-  const firstWeekKey = weekKeys[0];
-  const [year, week] = firstWeekKey.split("-W");
-  const weekNum = parseInt(week);
-  const jan4 = new Date(parseInt(year), 0, 4);
-  const dayOfWeek = jan4.getDay() || 7;
-  const firstMonday = new Date(jan4);
-  firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
-  const thursday = new Date(firstMonday);
-  thursday.setDate(firstMonday.getDate() + (weekNum - 1) * 7 + 3);
-
-  let currentMonthIndex = thursday.getMonth();
-  let weekInMonth = 1;
-
   const labels: string[] = [];
+  let lastLabel = "";
 
-  for (let i = 0; i < weekKeys.length; i++) {
-    labels.push(`${monthInitials[currentMonthIndex]}${weekInMonth}`);
+  for (const weekKey of weekKeys) {
+    const [year, week] = weekKey.split("-W");
+    const weekNum = parseInt(week);
 
-    // Advance for next iteration
-    weekInMonth++;
-    if (weekInMonth > 4) {
-      weekInMonth = 1;
-      currentMonthIndex = (currentMonthIndex + 1) % 12;
+    // Get Thursday of this ISO week
+    const jan4 = new Date(parseInt(year), 0, 4);
+    const dayOfWeek = jan4.getDay() || 7;
+    const firstMonday = new Date(jan4);
+    firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
+    const thursday = new Date(firstMonday);
+    thursday.setDate(firstMonday.getDate() + (weekNum - 1) * 7 + 3);
+
+    const month = thursday.getMonth();
+    const dayOfMonth = thursday.getDate();
+
+    // Determine week of month based on day of month
+    let weekOfMonth: number;
+    if (dayOfMonth <= 7) weekOfMonth = 1;
+    else if (dayOfMonth <= 14) weekOfMonth = 2;
+    else if (dayOfMonth <= 21) weekOfMonth = 3;
+    else weekOfMonth = 4;
+
+    let label = `${monthInitials[month]}${weekOfMonth}`;
+
+    // If this would be a duplicate, increment to next week/month
+    if (label === lastLabel) {
+      if (weekOfMonth < 4) {
+        weekOfMonth++;
+        label = `${monthInitials[month]}${weekOfMonth}`;
+      } else {
+        // Move to next month week 1
+        const nextMonth = (month + 1) % 12;
+        label = `${monthInitials[nextMonth]}1`;
+      }
     }
+
+    labels.push(label);
+    lastLabel = label;
   }
 
   return labels;
