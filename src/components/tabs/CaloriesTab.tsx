@@ -9,7 +9,7 @@
 // the UI and data always in sync.
 
 import type { LifeOS } from "@/lib/types";
-import { getThisWeekNutrition, ensureDayLog } from "@/lib/storage";
+import { getThisWeekNutrition, ensureDayLog, getSettings } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
 
 interface CaloriesTabProps {
@@ -18,6 +18,7 @@ interface CaloriesTabProps {
 }
 
 export default function CaloriesTab({ data, update }: CaloriesTabProps) {
+  const settings = getSettings(data);
   const thisWeekNutrition = getThisWeekNutrition(data);
   const loggedDays = thisWeekNutrition.filter((d) => d.calories !== null);
   const avgCalories =
@@ -93,15 +94,15 @@ export default function CaloriesTab({ data, update }: CaloriesTabProps) {
           {
             label: "Avg Calories",
             value: avgCalories > 0 ? `${avgCalories} kcal` : "-",
-            warn: avgCalories > 2000,
+            warn: avgCalories > settings.calorieTarget,
           },
-          { label: "Target", value: "2000 kcal", dim: true },
+          { label: "Target", value: `${settings.calorieTarget} kcal`, dim: true },
           {
             label: "Avg Protein",
             value: avgProtein > 0 ? `${avgProtein}g` : "-",
-            warn: avgProtein > 0 && avgProtein < 180,
+            warn: avgProtein > 0 && avgProtein < settings.proteinTarget,
           },
-          { label: "Target", value: "180g", dim: true },
+          { label: "Target", value: `${settings.proteinTarget}g`, dim: true },
         ].map(({ label, value, warn, dim }) => (
           <div
             key={label + value}

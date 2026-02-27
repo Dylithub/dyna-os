@@ -24,7 +24,7 @@ import SettingsTab from "@/components/tabs/SettingsTab";
 // Define our tabs — the id is internal, the label is what the user sees.
 const TABS = [
   { id: "today", label: "TODAY" },
-  { id: "contracts", label: "CONTRACTS" },
+  { id: "contracts", label: "EXERCISE" },
   { id: "weighin", label: "WEIGH-IN" },
   { id: "calories", label: "CALORIES" },
   { id: "finances", label: "FINANCES" },

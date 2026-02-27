@@ -5,7 +5,7 @@
 // Overspend recalculates allowed spend for remaining days.
 
 import type { LifeOS } from "@/lib/types";
-import { getThisWeekFinance, ensureDayLog } from "@/lib/storage";
+import { getThisWeekFinance, ensureDayLog, getSettings } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
 
 interface FinancesTabProps {
@@ -14,14 +14,15 @@ interface FinancesTabProps {
 }
 
 export default function FinancesTab({ data, update }: FinancesTabProps) {
+  const settings = getSettings(data);
   const thisWeekFinance = getThisWeekFinance(data);
 
   // Calculate totals
   const loggedDays = thisWeekFinance.filter((d) => d.amount !== null);
   const totalSpent = loggedDays.reduce((sum, d) => sum + (d.amount || 0), 0);
 
-  // Weekly target: $50 * 5 (Mon-Fri) + $75 * 2 (Sat-Sun) = $400
-  const weeklyTarget = 50 * 5 + 75 * 2; // $400
+  // Weekly target: weekday * 5 (Mon-Fri) + weekend * 2 (Sat-Sun)
+  const weeklyTarget = settings.weekdaySpendTarget * 5 + settings.weekendSpendTarget * 2;
 
   // Calculate target spent so far (only for logged days)
   const targetSpentSoFar = loggedDays.reduce((sum, d) => sum + d.target, 0);

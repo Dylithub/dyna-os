@@ -7,6 +7,7 @@
 
 import type { LifeOS } from "@/lib/types";
 import { getISOWeekKey } from "@/lib/dates";
+import { getSettings } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
 
 interface ContractsTabProps {
@@ -15,16 +16,33 @@ interface ContractsTabProps {
 }
 
 export default function ContractsTab({ data, update }: ContractsTabProps) {
+  const settings = getSettings(data);
   const weekKey = getISOWeekKey();
   const weekLog = data.weekLogs[weekKey];
   const ec = weekLog?.exerciseContract;
 
   const zone2Done = ec?.zone2Done || 0;
-  const strengthDone =
-    (ec?.strength?.armsChest ? 1 : 0) +
-    (ec?.strength?.legs ? 1 : 0) +
-    (ec?.strength?.coreBack ? 1 : 0);
-  const totalSessions = zone2Done + strengthDone;
+
+  // Get strength completion - use new format if available, otherwise legacy
+  function getStrengthDoneArray(): boolean[] {
+    if (ec?.strengthDone && ec.strengthDone.length > 0) {
+      return ec.strengthDone;
+    }
+    // Convert legacy format to array
+    if (ec?.strength) {
+      return [
+        ec.strength.armsChest || false,
+        ec.strength.legs || false,
+        ec.strength.coreBack || false,
+      ];
+    }
+    return [];
+  }
+
+  const strengthDoneArray = getStrengthDoneArray();
+  const strengthDoneCount = strengthDoneArray.filter(Boolean).length;
+  const totalSessions = zone2Done + strengthDoneCount;
+  const totalTarget = settings.zone2Sessions + settings.strengthSessions;
 
   function toggleZone2(sessionNum: number) {
     update((current) => {
@@ -37,10 +55,28 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
     });
   }
 
-  function toggleStrength(type: "armsChest" | "legs" | "coreBack") {
+  function toggleStrength(index: number) {
     update((current) => {
       const ec = current.weekLogs[weekKey].exerciseContract;
-      ec.strength[type] = !ec.strength[type];
+
+      // Initialize strengthDone array if needed
+      if (!ec.strengthDone || ec.strengthDone.length === 0) {
+        // Convert from legacy format
+        ec.strengthDone = [
+          ec.strength?.armsChest || false,
+          ec.strength?.legs || false,
+          ec.strength?.coreBack || false,
+        ];
+      }
+
+      // Ensure array has enough slots
+      while (ec.strengthDone.length < settings.strengthSessions) {
+        ec.strengthDone.push(false);
+      }
+
+      // Toggle the specific index
+      ec.strengthDone[index] = !ec.strengthDone[index];
+
       return { ...current };
     });
   }
@@ -48,21 +84,21 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
   return (
     <>
       <div className="text-base text-terminal-bright tracking-widest mb-4 pb-2.5 border-b border-terminal-border">
-        WEEKLY CONTRACTS - {weekKey}
+        WEEKLY EXERCISE - {weekKey}
       </div>
 
       <TerminalCard title="PROGRESS">
         <div className="flex justify-between items-center py-2">
           <span className="text-terminal-dim text-xs">TOTAL</span>
-          <span className={`text-xs ${totalSessions >= 7 ? "text-terminal-bright" : "text-terminal"}`}>
-            {totalSessions} / 7 sessions
+          <span className={`text-xs ${totalSessions >= totalTarget ? "text-terminal-bright" : "text-terminal"}`}>
+            {totalSessions} / {totalTarget} sessions
           </span>
         </div>
       </TerminalCard>
 
-      <TerminalCard title={`ZONE 2 CARDIO (4 x ${ec?.zone2MinutesEach || 40} min)`}>
+      <TerminalCard title={`ZONE 2 CARDIO (${settings.zone2Sessions} x ${settings.zone2Minutes} min)`}>
         <div className="flex flex-col gap-3 mt-2">
-          {[1, 2, 3, 4].map((i) => (
+          {Array.from({ length: settings.zone2Sessions }, (_, i) => i + 1).map((i) => (
             <label key={i} className="flex items-center gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
@@ -77,24 +113,24 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
         </div>
       </TerminalCard>
 
-      <TerminalCard title="STRENGTH (3 sessions)">
+      <TerminalCard title={`STRENGTH (${settings.strengthSessions} sessions)`}>
         <div className="flex flex-col gap-3 mt-2">
-          {([
-            ["armsChest", "Arms"],
-            ["legs", "Legs"],
-            ["coreBack", "Core / Back / Chest"],
-          ] as const).map(([key, label]) => (
-            <label key={key} className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ec?.strength?.[key] || false}
-                onChange={() => toggleStrength(key)}
-              />
-              <span className={ec?.strength?.[key] ? "text-terminal" : "text-terminal-dim"}>
-                {label}
-              </span>
-            </label>
-          ))}
+          {Array.from({ length: settings.strengthSessions }, (_, i) => {
+            const isChecked = strengthDoneArray[i] || false;
+            const label = settings.strengthLabels[i] || `Session ${i + 1}`;
+            return (
+              <label key={i} className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleStrength(i)}
+                />
+                <span className={isChecked ? "text-terminal" : "text-terminal-dim"}>
+                  {label}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </TerminalCard>
     </>

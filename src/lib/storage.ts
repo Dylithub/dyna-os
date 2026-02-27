@@ -1,7 +1,24 @@
-import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay } from "./types";
+import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay, UserSettings } from "./types";
 import { getTodayKey, getISOWeekKey, getMondayOfWeek, formatDateKey, hashString } from "./dates";
 
 const STORAGE_KEY = "fitness_terminal_mobile_v1";
+
+// Default target date is 12 weeks from now
+const defaultTargetDate = new Date();
+defaultTargetDate.setDate(defaultTargetDate.getDate() + 84);
+
+export const DEFAULT_SETTINGS: UserSettings = {
+  calorieTarget: 2000,
+  proteinTarget: 180,
+  weekdaySpendTarget: 50,
+  weekendSpendTarget: 75,
+  zone2Sessions: 4,
+  zone2Minutes: 40,
+  strengthSessions: 3,
+  strengthLabels: ["Arms", "Legs", "Core / Back / Chest"],
+  targetWeight: 180,
+  targetWeightDate: defaultTargetDate.toISOString().split("T")[0],
+};
 
 const DEFAULT_PHILOSOPHY_LINES = [
   "The only way to do great work is to love what you do.",
@@ -44,7 +61,24 @@ function createDefaultLifeOS(): LifeOS {
       philosophyLines: [...DEFAULT_PHILOSOPHY_LINES],
     },
     dailySelections: {},
+    settings: { ...DEFAULT_SETTINGS },
   };
+}
+
+/** Ensure settings exist with all required fields */
+export function ensureSettings(lifeOS: LifeOS): LifeOS {
+  if (!lifeOS.settings) {
+    lifeOS.settings = { ...DEFAULT_SETTINGS };
+  } else {
+    // Ensure all fields exist (for existing users upgrading)
+    lifeOS.settings = { ...DEFAULT_SETTINGS, ...lifeOS.settings };
+  }
+  return lifeOS;
+}
+
+/** Get current settings with defaults as fallback */
+export function getSettings(lifeOS: LifeOS): UserSettings {
+  return lifeOS.settings ? { ...DEFAULT_SETTINGS, ...lifeOS.settings } : { ...DEFAULT_SETTINGS };
 }
 
 /** Load LifeOS data from localStorage, or create defaults */
@@ -180,13 +214,14 @@ export function getThisWeekFinance(lifeOS: LifeOS): WeekFinanceDay[] {
   const todayKey = getTodayKey();
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const weekFinance: WeekFinanceDay[] = [];
+  const settings = getSettings(lifeOS);
 
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     const dateKey = formatDateKey(d);
-    // $50 Mon-Fri (0-4), $75 Sat-Sun (5-6)
-    const target = i < 5 ? 50 : 75;
+    // Use settings for weekday/weekend targets
+    const target = i < 5 ? settings.weekdaySpendTarget : settings.weekendSpendTarget;
     weekFinance.push({
       date: dateKey,
       dayName: dayNames[i],

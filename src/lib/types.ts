@@ -25,6 +25,7 @@ export interface DayLog {
   todos: string[];
 }
 
+// Legacy format - kept for backwards compatibility
 export interface StrengthSessions {
   armsChest: boolean;
   legs: boolean;
@@ -36,7 +37,8 @@ export interface ExerciseContract {
   zone2Done: number;
   zone2MinutesEach: number;
   strengthTarget: number;
-  strength: StrengthSessions;
+  strength: StrengthSessions; // Legacy format
+  strengthDone?: boolean[]; // New flexible format
 }
 
 export interface WeekLog {
@@ -58,6 +60,23 @@ export interface LifeOSMeta {
   lastOpenedAt: string;
 }
 
+export interface UserSettings {
+  // Nutrition targets
+  calorieTarget: number;
+  proteinTarget: number;
+  // Finance targets
+  weekdaySpendTarget: number;
+  weekendSpendTarget: number;
+  // Exercise targets
+  zone2Sessions: number;
+  zone2Minutes: number;
+  strengthSessions: number;
+  strengthLabels: string[];
+  // Weight target
+  targetWeight: number;
+  targetWeightDate: string; // ISO date string (YYYY-MM-DD)
+}
+
 export interface LifeOS {
   meta: LifeOSMeta;
   dayLogs: Record<string, DayLog>;
@@ -67,6 +86,7 @@ export interface LifeOS {
     philosophyLines: string[];
   };
   dailySelections: Record<string, { philosophyLine?: number }>;
+  settings?: UserSettings;
 }
 
 // Used by the Calories page to show the weekly grid

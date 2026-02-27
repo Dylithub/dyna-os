@@ -5,7 +5,7 @@
 
 import type { LifeOS } from "@/lib/types";
 import { getTodayKey, getISOWeekKey, getMondayOfWeek, formatDateKey } from "@/lib/dates";
-import { pickDailyPhilosophyLine, getThisWeekNutrition } from "@/lib/storage";
+import { pickDailyPhilosophyLine, getThisWeekNutrition, getSettings } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
 
 interface TodayTabProps {
@@ -13,6 +13,7 @@ interface TodayTabProps {
 }
 
 export default function TodayTab({ data }: TodayTabProps) {
+  const settings = getSettings(data);
   const todayKey = getTodayKey();
   const weekKey = getISOWeekKey();
   const dayLog = data.dayLogs[todayKey];
@@ -22,11 +23,20 @@ export default function TodayTab({ data }: TodayTabProps) {
   // Calculate exercise progress
   const ec = weekLog?.exerciseContract;
   const zone2Done = ec?.zone2Done || 0;
-  const strengthDone =
-    (ec?.strength?.armsChest ? 1 : 0) +
-    (ec?.strength?.legs ? 1 : 0) +
-    (ec?.strength?.coreBack ? 1 : 0);
+
+  // Count strength sessions - use new format if available, otherwise legacy
+  let strengthDone = 0;
+  if (ec?.strengthDone && ec.strengthDone.length > 0) {
+    strengthDone = ec.strengthDone.filter(Boolean).length;
+  } else if (ec?.strength) {
+    strengthDone =
+      (ec.strength.armsChest ? 1 : 0) +
+      (ec.strength.legs ? 1 : 0) +
+      (ec.strength.coreBack ? 1 : 0);
+  }
+
   const totalSessions = zone2Done + strengthDone;
+  const totalTarget = settings.zone2Sessions + settings.strengthSessions;
 
   // Check action items
   const checkInDone = dayLog?.checkIn?.mood !== null;
@@ -103,16 +113,16 @@ export default function TodayTab({ data }: TodayTabProps) {
         </div>
       </TerminalCard>
 
-      {/* Weekly contract progress */}
-      <TerminalCard title="WEEKLY CONTRACT">
+      {/* Weekly exercise progress */}
+      <TerminalCard title="WEEKLY EXERCISE">
         <div className="flex justify-between items-center py-2 border-b border-terminal/10">
           <span className="text-terminal-dim text-xs">SESSIONS</span>
-          <span className={`text-xs ${totalSessions >= 7 ? "text-terminal-bright" : "text-terminal"}`}>
-            {totalSessions} / 7
+          <span className={`text-xs ${totalSessions >= totalTarget ? "text-terminal-bright" : "text-terminal"}`}>
+            {totalSessions} / {totalTarget}
           </span>
         </div>
         <div className="flex gap-2 mt-2 flex-wrap">
-          {Array(7)
+          {Array(totalTarget)
             .fill(0)
             .map((_, i) => (
               <div
@@ -129,14 +139,14 @@ export default function TodayTab({ data }: TodayTabProps) {
       <TerminalCard title={`WEEKLY NUTRITION (${nutritionLoggedDays.length}/7)`}>
         <div className="flex justify-between items-center py-2 border-b border-terminal/10">
           <span className="text-terminal-dim text-xs">Avg Calories</span>
-          <span className={`text-xs ${avgCalories > 2000 ? "text-terminal-warning" : "text-terminal"}`}>
+          <span className={`text-xs ${avgCalories > settings.calorieTarget ? "text-terminal-warning" : "text-terminal"}`}>
             {avgCalories > 0 ? `${avgCalories} kcal` : "-"}
           </span>
         </div>
         <div className="flex justify-between items-center py-2 border-b border-terminal/10">
           <span className="text-terminal-dim text-xs">Avg Protein</span>
           <span
-            className={`text-xs ${avgProtein > 0 && avgProtein < 180 ? "text-terminal-warning" : "text-terminal"}`}
+            className={`text-xs ${avgProtein > 0 && avgProtein < settings.proteinTarget ? "text-terminal-warning" : "text-terminal"}`}
           >
             {avgProtein > 0 ? `${avgProtein}g` : "-"}
           </span>
