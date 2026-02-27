@@ -48,57 +48,38 @@ function formatWeekLabel(weekKey: string): string {
   return monthInitial;
 }
 
-// Generate labels - sequential 1-4 per month, guaranteed no duplicates
+// Generate labels - sequential 1-4 per month, cycling through months
+// Simple approach: start with first week's month, then just cycle 1-4 and advance month every 4 weeks
 function generateWeekLabels(weekKeys: string[]): string[] {
+  if (weekKeys.length === 0) return [];
+
   const monthInitials = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+
+  // Get starting month from first week's Thursday
+  const firstWeekKey = weekKeys[0];
+  const [year, week] = firstWeekKey.split("-W");
+  const weekNum = parseInt(week);
+  const jan4 = new Date(parseInt(year), 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const firstMonday = new Date(jan4);
+  firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
+  const thursday = new Date(firstMonday);
+  thursday.setDate(firstMonday.getDate() + (weekNum - 1) * 7 + 3);
+
+  let currentMonthIndex = thursday.getMonth();
+  let weekInMonth = 1;
+
   const labels: string[] = [];
 
-  // Track current position: which month and which week within that month
-  let currentMonth = -1;
-  let currentYear = -1;
-  let weekInMonth = 0;
-
   for (let i = 0; i < weekKeys.length; i++) {
-    const weekKey = weekKeys[i];
-    const [year, week] = weekKey.split("-W");
-    const weekNum = parseInt(week);
+    labels.push(`${monthInitials[currentMonthIndex]}${weekInMonth}`);
 
-    // Get Thursday of this ISO week to determine which month it "belongs" to
-    const jan4 = new Date(parseInt(year), 0, 4);
-    const dayOfWeek = jan4.getDay() || 7;
-    const firstMonday = new Date(jan4);
-    firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
-
-    const thursday = new Date(firstMonday);
-    thursday.setDate(firstMonday.getDate() + (weekNum - 1) * 7 + 3);
-
-    const thursdayMonth = thursday.getMonth();
-    const thursdayYear = thursday.getFullYear();
-
-    // First week: initialize
-    if (i === 0) {
-      currentMonth = thursdayMonth;
-      currentYear = thursdayYear;
+    // Advance for next iteration
+    weekInMonth++;
+    if (weekInMonth > 4) {
       weekInMonth = 1;
-    } else {
-      // Subsequent weeks: always increment
-      weekInMonth++;
-
-      // If we exceed 4 weeks OR the Thursday is in a new month, move to next month
-      if (weekInMonth > 4 || thursdayMonth !== currentMonth || thursdayYear !== currentYear) {
-        // Move to the next month (based on Thursday's actual month if it changed, else increment)
-        if (thursdayMonth !== currentMonth || thursdayYear !== currentYear) {
-          currentMonth = thursdayMonth;
-          currentYear = thursdayYear;
-        } else {
-          currentMonth = (currentMonth + 1) % 12;
-          if (currentMonth === 0) currentYear++;
-        }
-        weekInMonth = 1;
-      }
+      currentMonthIndex = (currentMonthIndex + 1) % 12;
     }
-
-    labels.push(`${monthInitials[currentMonth]}${weekInMonth}`);
   }
 
   return labels;
