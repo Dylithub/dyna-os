@@ -18,6 +18,7 @@ interface WeekLogRow {
   zone2Done: number | null;
   zone2MinutesEach: number | null;
   zone2Days: string | null; // JSON array of day numbers
+  completions: string | null; // JSON array of {slotId, completedAt}
   strengthTarget: number | null;
   strengthDay1: number | null; // Day of week (1-7) or null
   strengthDay2: number | null;
@@ -86,12 +87,23 @@ export function dbToLifeOS(
       }
     }
 
+    // Parse completions from JSON
+    let completions: Array<{slotId: string; completedAt: number}> | undefined;
+    if (row.completions) {
+      try {
+        completions = JSON.parse(row.completions);
+      } catch {
+        completions = undefined;
+      }
+    }
+
     weekLogs[row.weekKey] = {
       weighIn: {
         weightLb: row.weighInLb,
         timestamp: row.weighInTimestamp,
       },
       exerciseContract: {
+        completions: completions || [],
         zone2Target: row.zone2Target ?? 4,
         zone2Done: row.zone2Done ?? 0,
         zone2MinutesEach: row.zone2MinutesEach ?? 40,
@@ -173,6 +185,7 @@ export function weekLogToRow(weekKey: string, weekLog: WeekLog) {
     zone2Done: ec.zone2Done,
     zone2MinutesEach: ec.zone2MinutesEach,
     zone2Days: ec.zone2Days ? JSON.stringify(ec.zone2Days) : null,
+    completions: ec.completions && ec.completions.length > 0 ? JSON.stringify(ec.completions) : null,
     strengthTarget: ec.strengthTarget,
     strengthDay1: day1,
     strengthDay2: day2,

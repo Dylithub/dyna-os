@@ -482,7 +482,29 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
   }
 
   if (server.weekLogs) {
-    merged.weekLogs = { ...local.weekLogs, ...server.weekLogs };
+    merged.weekLogs = { ...local.weekLogs };
+    for (const [key, serverWeek] of Object.entries(server.weekLogs)) {
+      const localWeek = local.weekLogs[key];
+      if (!localWeek) {
+        merged.weekLogs[key] = serverWeek;
+      } else {
+        // Merge weekLogs - prefer local completions if they exist, otherwise use server
+        const localCompletions = localWeek.exerciseContract?.completions || [];
+        const serverCompletions = serverWeek.exerciseContract?.completions || [];
+        // Use whichever has more completions (most recent data)
+        const mergedCompletions = localCompletions.length >= serverCompletions.length 
+          ? localCompletions 
+          : serverCompletions;
+        
+        merged.weekLogs[key] = {
+          ...serverWeek,
+          exerciseContract: {
+            ...serverWeek.exerciseContract,
+            completions: mergedCompletions,
+          },
+        };
+      }
+    }
   }
 
   if (server.weightEntries) {
