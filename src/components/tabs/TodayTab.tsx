@@ -31,22 +31,27 @@ export default function TodayTab({ data, update }: TodayTabProps) {
     update((current) => closeOutWeek(current, pendingWeekKey));
   }
 
-  // Calculate exercise progress
+  // Calculate exercise progress - use new completions array if available
   const ec = weekLog?.exerciseContract;
-  const zone2Done = ec?.zone2Done || 0;
+  let totalSessions = 0;
 
-  // Count strength sessions - use new format if available, otherwise legacy
-  let strengthDone = 0;
-  if (ec?.strengthDone && ec.strengthDone.length > 0) {
-    strengthDone = ec.strengthDone.filter(Boolean).length;
-  } else if (ec?.strength) {
-    strengthDone =
-      (ec.strength.armsChest ? 1 : 0) +
-      (ec.strength.legs ? 1 : 0) +
-      (ec.strength.coreBack ? 1 : 0);
+  if (ec?.completions && ec.completions.length > 0) {
+    // New model: count completions array
+    totalSessions = ec.completions.length;
+  } else {
+    // Legacy fallback
+    const zone2Done = ec?.zone2Done || 0;
+    let strengthDone = 0;
+    if (ec?.strengthDone && ec.strengthDone.length > 0) {
+      strengthDone = ec.strengthDone.filter(Boolean).length;
+    } else if (ec?.strength) {
+      strengthDone =
+        (ec.strength.armsChest ? 1 : 0) +
+        (ec.strength.legs ? 1 : 0) +
+        (ec.strength.coreBack ? 1 : 0);
+    }
+    totalSessions = zone2Done + strengthDone;
   }
-
-  const totalSessions = zone2Done + strengthDone;
   const totalTarget = settings.exerciseTarget || 7;
 
   // Check action items
