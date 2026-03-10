@@ -1,6 +1,8 @@
 // These types define the exact shape of your data.
-// They match the structure from your original HTML app,
-// minus the removed features (measurements, food log, wisdom).
+// Refactored to support:
+// - Weekly close-out workflow
+// - Clean exercise tracking with ordered completions
+// - Archived weekly summaries
 
 export interface CheckIn {
   mood: number | null;
@@ -25,6 +27,13 @@ export interface DayLog {
   todos: string[];
 }
 
+// Exercise completion stored as ordered array
+// Each item has the slot ID and when it was completed (for ordering)
+export interface ExerciseCompletion {
+  slotId: string; // e.g., "cardio-0", "legs-0", "push-0", "pull-0"
+  completedAt: number; // timestamp for ordering
+}
+
 // Legacy format - kept for backwards compatibility
 export interface StrengthSessions {
   armsChest: boolean;
@@ -32,13 +41,19 @@ export interface StrengthSessions {
   coreBack: boolean;
 }
 
+// Exercise contract for a week - uses ordered completion model
 export interface ExerciseContract {
+  // New ordered completion model
+  completions?: ExerciseCompletion[];
+
+  // Legacy fields for backwards compatibility
   zone2Target: number;
   zone2Done: number;
   zone2MinutesEach: number;
   strengthTarget: number;
-  strength: StrengthSessions; // Legacy format
-  strengthDone?: boolean[]; // New flexible format
+  strength: StrengthSessions;
+  strengthDone?: (number | null)[];
+  zone2Days?: (number | null)[];
 }
 
 export interface WeekLog {
@@ -47,6 +62,38 @@ export interface WeekLog {
     timestamp: string | null;
   };
   exerciseContract: ExerciseContract;
+}
+
+// Weekly summary created when a week is closed out
+export interface WeeklySummary {
+  weekKey: string; // e.g., "2025-W09"
+  startDate: string; // Monday YYYY-MM-DD
+  endDate: string; // Sunday YYYY-MM-DD
+  closedAt: string; // ISO timestamp when closed
+
+  // Nutrition averages
+  avgCalories: number | null;
+  avgProtein: number | null;
+  daysWithNutrition: number;
+
+  // Check-in averages
+  avgMood: number | null;
+  avgEnergy: number | null;
+  avgStress: number | null;
+  daysWithCheckIn: number;
+
+  // Exercise
+  exerciseSessionsCompleted: number;
+  exerciseTarget: number;
+
+  // Finances
+  totalSpent: number;
+  weeklyBudget: number;
+
+  // Weight
+  startWeight: number | null;
+  endWeight: number | null;
+  weightChange: number | null;
 }
 
 export interface WeightEntry {
@@ -60,6 +107,13 @@ export interface LifeOSMeta {
   lastOpenedAt: string;
 }
 
+// Exercise slot configuration
+export interface ExerciseSlot {
+  id: string;
+  label: string;
+  type: "cardio" | "legs" | "push" | "pull" | "custom";
+}
+
 export interface UserSettings {
   // Nutrition targets
   calorieTarget: number;
@@ -67,7 +121,10 @@ export interface UserSettings {
   // Finance targets
   weekdaySpendTarget: number;
   weekendSpendTarget: number;
-  // Exercise targets
+  // Exercise targets - new unified model
+  exerciseTarget: number; // total sessions per week (default 7)
+  exerciseSlots: ExerciseSlot[]; // configurable exercise types
+  // Legacy exercise settings (preserved for migration)
   zone2Sessions: number;
   zone2Minutes: number;
   strengthSessions: number;
@@ -76,6 +133,9 @@ export interface UserSettings {
   targetWeight: number;
   targetWeightDate: string; // ISO date string (YYYY-MM-DD)
 }
+
+// Week status for tracking lifecycle
+export type WeekStatus = "active" | "pending_closeout" | "archived";
 
 export interface LifeOS {
   meta: LifeOSMeta;
@@ -87,6 +147,13 @@ export interface LifeOS {
   };
   dailySelections: Record<string, { philosophyLine?: number }>;
   settings?: UserSettings;
+
+  // Weekly archive system
+  archivedWeeks?: WeeklySummary[];
+
+  // Track which week is active vs pending close-out
+  // If activeWeekKey doesn't match calendar week, the previous week needs close-out
+  activeWeekKey?: string;
 }
 
 // Used by the Calories page to show the weekly grid

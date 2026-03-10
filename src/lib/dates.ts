@@ -52,3 +52,9 @@ export function hashString(str: string): number {
   }
   return Math.abs(hash);
 }
+
+/** Returns the day of week as 1-7 (1=Monday, 7=Sunday) */
+export function getDayOfWeek(date: Date = new Date()): number {
+  const day = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  return day === 0 ? 7 : day; // Convert to 1=Monday, 7=Sunday
+}

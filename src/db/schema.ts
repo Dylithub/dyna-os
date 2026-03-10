@@ -84,9 +84,10 @@ export const weekLogs = sqliteTable(
     zone2Done: integer("zone2_done").default(0),
     zone2MinutesEach: integer("zone2_minutes_each").default(40),
     strengthTarget: integer("strength_target").default(3),
-    strengthArmsChest: integer("strength_arms_chest", { mode: "boolean" }).default(false),
-    strengthLegs: integer("strength_legs", { mode: "boolean" }).default(false),
-    strengthCoreBack: integer("strength_core_back", { mode: "boolean" }).default(false),
+    strengthDay1: integer("strength_arms_chest"), // Day of week (1-7) or null
+    strengthDay2: integer("strength_legs"), // Repurposed columns, keeping DB names for compat
+    strengthDay3: integer("strength_core_back"),
+    zone2Days: text("zone2_days"), // JSON array of day numbers, e.g. "[1,3,5,null]"
     weighInLb: real("weigh_in_lb"),
     weighInTimestamp: text("weigh_in_timestamp"),
     updatedAt: text("updated_at")

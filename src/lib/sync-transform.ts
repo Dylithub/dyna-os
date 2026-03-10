@@ -17,10 +17,11 @@ interface WeekLogRow {
   zone2Target: number | null;
   zone2Done: number | null;
   zone2MinutesEach: number | null;
+  zone2Days: string | null; // JSON array of day numbers
   strengthTarget: number | null;
-  strengthArmsChest: boolean | null;
-  strengthLegs: boolean | null;
-  strengthCoreBack: boolean | null;
+  strengthDay1: number | null; // Day of week (1-7) or null
+  strengthDay2: number | null;
+  strengthDay3: number | null;
   weighInLb: number | null;
   weighInTimestamp: string | null;
   updatedAt: string;
@@ -68,6 +69,23 @@ export function dbToLifeOS(
 
   const weekLogs: Record<string, WeekLog> = {};
   for (const row of weekLogRows) {
+    // Convert DB day numbers to strengthDone array
+    const strengthDone: (number | null)[] = [
+      row.strengthDay1,
+      row.strengthDay2,
+      row.strengthDay3,
+    ];
+
+    // Parse zone2Days from JSON
+    let zone2Days: (number | null)[] | undefined;
+    if (row.zone2Days) {
+      try {
+        zone2Days = JSON.parse(row.zone2Days);
+      } catch {
+        zone2Days = undefined;
+      }
+    }
+
     weekLogs[row.weekKey] = {
       weighIn: {
         weightLb: row.weighInLb,
@@ -79,10 +97,13 @@ export function dbToLifeOS(
         zone2MinutesEach: row.zone2MinutesEach ?? 40,
         strengthTarget: row.strengthTarget ?? 3,
         strength: {
-          armsChest: row.strengthArmsChest ?? false,
-          legs: row.strengthLegs ?? false,
-          coreBack: row.strengthCoreBack ?? false,
+          // Legacy format - derive from day numbers for backwards compat
+          armsChest: row.strengthDay1 !== null && row.strengthDay1 > 0,
+          legs: row.strengthDay2 !== null && row.strengthDay2 > 0,
+          coreBack: row.strengthDay3 !== null && row.strengthDay3 > 0,
         },
+        strengthDone,
+        zone2Days,
       },
     };
   }
@@ -128,15 +149,34 @@ export function dayLogToRow(dateKey: string, dayLog: DayLog) {
 }
 
 export function weekLogToRow(weekKey: string, weekLog: WeekLog) {
+  const ec = weekLog.exerciseContract;
+
+  // Use strengthDone array if available, otherwise fall back to legacy format
+  let day1: number | null = null;
+  let day2: number | null = null;
+  let day3: number | null = null;
+
+  if (ec.strengthDone && ec.strengthDone.length > 0) {
+    day1 = ec.strengthDone[0] ?? null;
+    day2 = ec.strengthDone[1] ?? null;
+    day3 = ec.strengthDone[2] ?? null;
+  } else if (ec.strength) {
+    // Convert legacy booleans to day numbers (use 1 as placeholder for "done")
+    day1 = ec.strength.armsChest ? 1 : null;
+    day2 = ec.strength.legs ? 1 : null;
+    day3 = ec.strength.coreBack ? 1 : null;
+  }
+
   return {
     weekKey,
-    zone2Target: weekLog.exerciseContract.zone2Target,
-    zone2Done: weekLog.exerciseContract.zone2Done,
-    zone2MinutesEach: weekLog.exerciseContract.zone2MinutesEach,
-    strengthTarget: weekLog.exerciseContract.strengthTarget,
-    strengthArmsChest: weekLog.exerciseContract.strength.armsChest,
-    strengthLegs: weekLog.exerciseContract.strength.legs,
-    strengthCoreBack: weekLog.exerciseContract.strength.coreBack,
+    zone2Target: ec.zone2Target,
+    zone2Done: ec.zone2Done,
+    zone2MinutesEach: ec.zone2MinutesEach,
+    zone2Days: ec.zone2Days ? JSON.stringify(ec.zone2Days) : null,
+    strengthTarget: ec.strengthTarget,
+    strengthDay1: day1,
+    strengthDay2: day2,
+    strengthDay3: day3,
     weighInLb: weekLog.weighIn.weightLb,
     weighInTimestamp: weekLog.weighIn.timestamp,
     updatedAt: new Date().toISOString(),

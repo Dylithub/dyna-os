@@ -101,7 +101,7 @@ export default function Home() {
 
       {/* Content */}
       <main className="flex-1 p-4 overflow-y-auto text-terminal pb-20">
-        {activeTab === "today" && <TodayTab data={data} />}
+        {activeTab === "today" && <TodayTab data={data} update={update} />}
         {activeTab === "contracts" && <ContractsTab data={data} update={update} />}
         {activeTab === "weighin" && <WeighInTab data={data} update={update} />}
         {activeTab === "calories" && <CaloriesTab data={data} update={update} />}

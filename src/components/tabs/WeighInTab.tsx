@@ -73,7 +73,7 @@ export default function WeighInTab({ data, update }: WeighInTabProps) {
     avgLossPerMonth = totalChange / (monthlyData.length - 1);
 
     if (avgLossPerMonth > 0 && toGo !== null && toGo > 0) {
-      monthsToGoal = Math.ceil(toGo / avgLossPerMonth);
+      monthsToGoal = Math.round((toGo / avgLossPerMonth) * 10) / 10;
     }
 
     if (targetDate && latestWeight !== null) {

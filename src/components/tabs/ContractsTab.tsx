@@ -1,13 +1,12 @@
 "use client";
 
-// Weekly exercise contracts — Zone 2 cardio + strength training.
-// The key React concept here: when a checkbox changes, we call
-// update() which modifies the data and triggers a re-render.
-// React handles redrawing the UI automatically.
+// Weekly exercise contracts using ordered completion model.
+// Each completed exercise stores its sequence number (1-7).
+// When one is cleared, remaining are renumbered to stay continuous.
 
-import type { LifeOS } from "@/lib/types";
+import type { LifeOS, ExerciseCompletion } from "@/lib/types";
 import { getISOWeekKey } from "@/lib/dates";
-import { getSettings } from "@/lib/storage";
+import { getSettings, ensureWeekLog } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
 
 interface ContractsTabProps {
@@ -21,65 +20,64 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
   const weekLog = data.weekLogs[weekKey];
   const ec = weekLog?.exerciseContract;
 
-  const zone2Done = ec?.zone2Done || 0;
+  // Get completions array (use new model or empty)
+  const completions: ExerciseCompletion[] = ec?.completions || [];
 
-  // Get strength completion - use new format if available, otherwise legacy
-  function getStrengthDoneArray(): boolean[] {
-    if (ec?.strengthDone && ec.strengthDone.length > 0) {
-      return ec.strengthDone;
-    }
-    // Convert legacy format to array
-    if (ec?.strength) {
-      return [
-        ec.strength.armsChest || false,
-        ec.strength.legs || false,
-        ec.strength.coreBack || false,
-      ];
-    }
-    return [];
+  // Get the display number for a slot (1-indexed position in completion order)
+  function getDisplayNumber(slotId: string): number | null {
+    const sorted = [...completions].sort((a, b) => a.completedAt - b.completedAt);
+    const index = sorted.findIndex((c) => c.slotId === slotId);
+    return index >= 0 ? index + 1 : null;
   }
 
-  const strengthDoneArray = getStrengthDoneArray();
-  const strengthDoneCount = strengthDoneArray.filter(Boolean).length;
-  const totalSessions = zone2Done + strengthDoneCount;
-  const totalTarget = settings.zone2Sessions + settings.strengthSessions;
+  // Check if a slot is completed
+  function isSlotCompleted(slotId: string): boolean {
+    return completions.some((c) => c.slotId === slotId);
+  }
 
-  function toggleZone2(sessionNum: number) {
+  // Count total sessions
+  const totalSessions = completions.length;
+  const totalTarget = settings.exerciseTarget || 7;
+
+  // Toggle a slot: if empty, add; if filled, remove and renumber
+  function toggleSlot(slotId: string) {
     update((current) => {
-      const ec = current.weekLogs[weekKey].exerciseContract;
-      const currentDone = ec.zone2Done || 0;
-      // If clicking a checked session, uncheck it and all after it.
-      // If clicking an unchecked session, check it and all before it.
-      ec.zone2Done = sessionNum <= currentDone ? sessionNum - 1 : sessionNum;
-      return { ...current };
+      let updated = ensureWeekLog(current, weekKey);
+      const wl = updated.weekLogs[weekKey];
+      if (!wl || !wl.exerciseContract) return current;
+
+      const ec = { ...wl.exerciseContract };
+      let newCompletions: ExerciseCompletion[] = [...(ec.completions || [])];
+
+      const existingIndex = newCompletions.findIndex((c) => c.slotId === slotId);
+
+      if (existingIndex >= 0) {
+        // CLEAR: Remove this completion
+        newCompletions.splice(existingIndex, 1);
+        // No need to renumber - the display order is derived from completedAt timestamps
+      } else {
+        // ADD: Only if under max
+        if (newCompletions.length >= 7) {
+          return current; // Already at max
+        }
+        newCompletions.push({
+          slotId,
+          completedAt: Date.now(),
+        });
+      }
+
+      ec.completions = newCompletions;
+
+      // Update legacy fields for backwards compatibility
+      ec.zone2Done = newCompletions.filter((c) => c.slotId.startsWith("cardio")).length;
+
+      wl.exerciseContract = ec;
+      return { ...updated };
     });
   }
 
-  function toggleStrength(index: number) {
-    update((current) => {
-      const ec = current.weekLogs[weekKey].exerciseContract;
-
-      // Initialize strengthDone array if needed
-      if (!ec.strengthDone || ec.strengthDone.length === 0) {
-        // Convert from legacy format
-        ec.strengthDone = [
-          ec.strength?.armsChest || false,
-          ec.strength?.legs || false,
-          ec.strength?.coreBack || false,
-        ];
-      }
-
-      // Ensure array has enough slots
-      while (ec.strengthDone.length < settings.strengthSessions) {
-        ec.strengthDone.push(false);
-      }
-
-      // Toggle the specific index
-      ec.strengthDone[index] = !ec.strengthDone[index];
-
-      return { ...current };
-    });
-  }
+  // Get exercise slots from settings
+  const exerciseSlots = settings.exerciseSlots || [];
 
   return (
     <>
@@ -90,49 +88,55 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
       <TerminalCard title="PROGRESS">
         <div className="flex justify-between items-center py-2">
           <span className="text-terminal-dim text-xs">TOTAL</span>
-          <span className={`text-xs ${totalSessions >= totalTarget ? "text-terminal-bright" : "text-terminal"}`}>
+          <span className={totalSessions >= totalTarget ? "text-xs text-terminal-bright" : "text-xs text-terminal"}>
             {totalSessions} / {totalTarget} sessions
           </span>
         </div>
-      </TerminalCard>
-
-      <TerminalCard title={`ZONE 2 CARDIO (${settings.zone2Sessions} x ${settings.zone2Minutes} min)`}>
-        <div className="flex flex-col gap-3 mt-2">
-          {Array.from({ length: settings.zone2Sessions }, (_, i) => i + 1).map((i) => (
-            <label key={i} className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={i <= zone2Done}
-                onChange={() => toggleZone2(i)}
-              />
-              <span className={i <= zone2Done ? "text-terminal" : "text-terminal-dim"}>
-                Session {i}
-              </span>
-            </label>
+        <div className="flex gap-2 mt-2 flex-wrap">
+          {Array(totalTarget).fill(0).map((_, i) => (
+            <div
+              key={i}
+              className={i < totalSessions ? "w-6 h-6 border border-terminal bg-terminal" : "w-6 h-6 border border-terminal-border bg-transparent"}
+            />
           ))}
         </div>
       </TerminalCard>
 
-      <TerminalCard title={`STRENGTH (${settings.strengthSessions} sessions)`}>
+      <TerminalCard title="EXERCISE SLOTS">
         <div className="flex flex-col gap-3 mt-2">
-          {Array.from({ length: settings.strengthSessions }, (_, i) => {
-            const isChecked = strengthDoneArray[i] || false;
-            const label = settings.strengthLabels[i] || `Session ${i + 1}`;
+          {exerciseSlots.map((slot) => {
+            const displayNum = getDisplayNumber(slot.id);
+            const isDone = displayNum !== null;
             return (
-              <label key={i} className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => toggleStrength(i)}
-                />
-                <span className={isChecked ? "text-terminal" : "text-terminal-dim"}>
-                  {label}
+              <label key={slot.id} className="flex items-center gap-2.5 cursor-pointer">
+                <span
+                  onClick={() => toggleSlot(slot.id)}
+                  className={isDone
+                    ? "w-6 h-6 flex items-center justify-center border text-xs font-bold cursor-pointer select-none bg-terminal/20 border-terminal text-terminal"
+                    : "w-6 h-6 flex items-center justify-center border text-xs font-bold cursor-pointer select-none border-terminal-dim text-terminal-dim hover:border-terminal/50"
+                  }
+                >
+                  {isDone ? displayNum : ""}
+                </span>
+                <span
+                  onClick={() => toggleSlot(slot.id)}
+                  className={isDone ? "text-terminal" : "text-terminal-dim"}
+                >
+                  {slot.label}
                 </span>
               </label>
             );
           })}
         </div>
       </TerminalCard>
+
+      {totalSessions >= totalTarget && (
+        <TerminalCard title="WEEK COMPLETE">
+          <div className="text-terminal-bright text-center py-2">
+            All {totalTarget} sessions completed!
+          </div>
+        </TerminalCard>
+      )}
     </>
   );
 }

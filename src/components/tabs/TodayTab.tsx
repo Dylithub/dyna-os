@@ -5,20 +5,31 @@
 
 import type { LifeOS } from "@/lib/types";
 import { getTodayKey, getISOWeekKey, getMondayOfWeek, formatDateKey } from "@/lib/dates";
-import { pickDailyPhilosophyLine, getThisWeekNutrition, getSettings } from "@/lib/storage";
+import { pickDailyPhilosophyLine, getThisWeekNutrition, getSettings, hasPendingWeekCloseout, getPendingCloseoutWeekKey, calculateWeeklySummary, closeOutWeek } from "@/lib/storage";
 import TerminalCard from "@/components/TerminalCard";
+import TerminalButton from "@/components/TerminalButton";
 
 interface TodayTabProps {
+  update?: (updater: (current: LifeOS) => LifeOS) => void;
   data: LifeOS;
 }
 
-export default function TodayTab({ data }: TodayTabProps) {
+export default function TodayTab({ data, update }: TodayTabProps) {
   const settings = getSettings(data);
   const todayKey = getTodayKey();
   const weekKey = getISOWeekKey();
   const dayLog = data.dayLogs[todayKey];
   const weekLog = data.weekLogs[weekKey];
   const philosophyLine = pickDailyPhilosophyLine(data, todayKey);
+  // Check for pending week close-out
+  const pendingCloseout = hasPendingWeekCloseout(data);
+  const pendingWeekKey = getPendingCloseoutWeekKey(data);
+  const pendingSummary = pendingWeekKey ? calculateWeeklySummary(data, pendingWeekKey) : null;
+
+  function handleCloseOutWeek() {
+    if (!update || !pendingWeekKey) return;
+    update((current) => closeOutWeek(current, pendingWeekKey));
+  }
 
   // Calculate exercise progress
   const ec = weekLog?.exerciseContract;
@@ -36,7 +47,7 @@ export default function TodayTab({ data }: TodayTabProps) {
   }
 
   const totalSessions = zone2Done + strengthDone;
-  const totalTarget = settings.zone2Sessions + settings.strengthSessions;
+  const totalTarget = settings.exerciseTarget || 7;
 
   // Check action items
   const checkInDone = dayLog?.checkIn?.mood !== null;
@@ -106,6 +117,25 @@ export default function TodayTab({ data }: TodayTabProps) {
         })}
       </div>
 
+      {/* Week Close-Out Banner */}
+      {pendingCloseout && pendingSummary && update && (
+        <TerminalCard title="WEEK READY TO CLOSE" highlight>
+          <div className="text-terminal-bright text-xs mb-3">
+            {pendingWeekKey} ({pendingSummary.startDate} to {pendingSummary.endDate})
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+            <div>Avg Calories: {pendingSummary.avgCalories ?? "-"}</div>
+            <div>Avg Protein: {pendingSummary.avgProtein ?? "-"}g</div>
+            <div>Exercise: {pendingSummary.exerciseSessionsCompleted}/{pendingSummary.exerciseTarget}</div>
+            <div>Avg Mood: {pendingSummary.avgMood ?? "-"}/5</div>
+            <div>Spent: ${pendingSummary.totalSpent}</div>
+            <div>Budget: ${pendingSummary.weeklyBudget}</div>
+          </div>
+          <TerminalButton onClick={handleCloseOutWeek}>
+            CLOSE OUT WEEK
+          </TerminalButton>
+        </TerminalCard>
+      )}
       {/* Daily wisdom quote */}
       <TerminalCard highlight>
         <div className="text-terminal-bright italic text-xs leading-relaxed">
