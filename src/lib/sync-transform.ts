@@ -1,4 +1,4 @@
-import type { LifeOS, DayLog, WeekLog, WeightEntry } from "./types";
+import type { LifeOS, DayLog, WeekLog, WeightEntry, WorkoutSession } from "./types";
 
 // DB row types (matching Drizzle select results)
 interface DayLogRow {
@@ -19,6 +19,7 @@ interface WeekLogRow {
   zone2MinutesEach: number | null;
   zone2Days: string | null; // JSON array of day numbers
   completions: string | null; // JSON array of {slotId, completedAt}
+  workoutSessions: string | null; // JSON array of WorkoutSession
   strengthTarget: number | null;
   strengthDay1: number | null; // Day of week (1-7) or null
   strengthDay2: number | null;
@@ -97,11 +98,22 @@ export function dbToLifeOS(
       }
     }
 
+    // Parse workout sessions from JSON
+    let workoutSessions: WorkoutSession[] | undefined;
+    if (row.workoutSessions) {
+      try {
+        workoutSessions = JSON.parse(row.workoutSessions);
+      } catch {
+        workoutSessions = undefined;
+      }
+    }
+
     weekLogs[row.weekKey] = {
       weighIn: {
         weightLb: row.weighInLb,
         timestamp: row.weighInTimestamp,
       },
+      workoutSessions: workoutSessions || [],
       exerciseContract: {
         completions: completions || [],
         zone2Target: row.zone2Target ?? 4,
@@ -186,6 +198,7 @@ export function weekLogToRow(weekKey: string, weekLog: WeekLog) {
     zone2MinutesEach: ec.zone2MinutesEach,
     zone2Days: ec.zone2Days ? JSON.stringify(ec.zone2Days) : null,
     completions: ec.completions && ec.completions.length > 0 ? JSON.stringify(ec.completions) : null,
+    workoutSessions: weekLog.workoutSessions && weekLog.workoutSessions.length > 0 ? JSON.stringify(weekLog.workoutSessions) : null,
     strengthTarget: ec.strengthTarget,
     strengthDay1: day1,
     strengthDay2: day2,

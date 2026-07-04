@@ -8,7 +8,7 @@ export default function LoginPage() {
     >
       <header className="px-5 py-4 border-b border-terminal-border bg-terminal-surface">
         <div className="text-terminal text-base tracking-widest">
-          DYNA OPTICS
+          DRACKER OS
         </div>
         <div className="text-terminal-dim text-[10px] mt-0.5 tracking-wider">
           LIFESTYLE OS

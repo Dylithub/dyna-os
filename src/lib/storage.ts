@@ -1,4 +1,4 @@
-import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay, UserSettings, WeeklySummary, ExerciseSlot } from "./types";
+import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay, UserSettings, WeeklySummary, ExerciseSlot, WorkoutTemplates, WorkoutSession } from "./types";
 import { getTodayKey, getISOWeekKey, getMondayOfWeek, formatDateKey, hashString } from "./dates";
 
 const STORAGE_KEY = "fitness_terminal_mobile_v1";
@@ -18,6 +18,40 @@ const DEFAULT_EXERCISE_SLOTS: ExerciseSlot[] = [
   { id: "pull-0", label: "Pull", type: "pull" },
 ];
 
+// User's real push/pull/legs routines (editable in Settings → WORKOUT TEMPLATES).
+// startKg prefills the weight until a logged session exists for that exercise.
+export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplates = {
+  pull: [
+    { name: "Straight-Arm Cable Pulldown (activation)", targetSets: 2, targetReps: 12 },
+    { name: "Lat Pulldown", targetSets: 2, targetReps: 8, startKg: 55 },
+    { name: "Chest Supported Row", targetSets: 2, targetReps: 8, startKg: 40 },
+    { name: "Seated Cable Row", targetSets: 2, targetReps: 10, startKg: 45 },
+    { name: "Preacher Curls", targetSets: 2, targetReps: 8, startKg: 46 },
+    { name: "Behind-Back Wrist Curls", targetSets: 3, targetReps: 12, startKg: 20 },
+    { name: "Hammer Curls", targetSets: 2, targetReps: 10, startKg: 7 },
+    { name: "Face Pulls", targetSets: 2, targetReps: 12, startKg: 20 },
+  ],
+  push: [
+    { name: "Pec Deck / Chest Fly (activation)", targetSets: 2, targetReps: 12, startKg: 47 },
+    { name: "Incline Press", targetSets: 2, targetReps: 8, startKg: 22.5 },
+    { name: "Flat Press", targetSets: 2, targetReps: 8 },
+    { name: "Overhead Shoulder Press Machine (per side)", targetSets: 2, targetReps: 10, startKg: 10 },
+    { name: "Lateral Raises", targetSets: 3, targetReps: 12, startKg: 5 },
+    { name: "Overhead Cable Triceps Extension", targetSets: 2, targetReps: 10 },
+    { name: "Skull Crushers / Rope Pushdowns", targetSets: 2, targetReps: 10 },
+  ],
+  legs: [
+    { name: "Seated Leg Curl", targetSets: 2, targetReps: 10, startKg: 73 },
+    { name: "Leg Press (shoes off)", targetSets: 2, targetReps: 8, startKg: 115 },
+    { name: "Bulgarian Split Squats (each leg)", targetSets: 2, targetReps: 10 },
+    { name: "Hyperextension", targetSets: 2, targetReps: 12 },
+    { name: "Leg Extension", targetSets: 2, targetReps: 12 },
+    { name: "Abductor + Adductor", targetSets: 3, targetReps: 12 },
+    { name: "Standing Calf Raises", targetSets: 3, targetReps: 12 },
+    { name: "Tibialis Raises", targetSets: 3, targetReps: 15 },
+  ],
+};
+
 export const DEFAULT_SETTINGS: UserSettings = {
   calorieTarget: 2000,
   proteinTarget: 180,
@@ -26,6 +60,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   // New exercise model
   exerciseTarget: 7,
   exerciseSlots: DEFAULT_EXERCISE_SLOTS,
+  workoutTemplates: DEFAULT_WORKOUT_TEMPLATES,
   // Legacy exercise settings (kept for migration)
   zone2Sessions: 4,
   zone2Minutes: 40,
@@ -93,6 +128,9 @@ export function ensureSettings(lifeOS: LifeOS): LifeOS {
     if (!lifeOS.settings.exerciseTarget) {
       lifeOS.settings.exerciseTarget = 7;
     }
+    if (!lifeOS.settings.workoutTemplates) {
+      lifeOS.settings.workoutTemplates = DEFAULT_WORKOUT_TEMPLATES;
+    }
   }
   return lifeOS;
 }
@@ -105,6 +143,9 @@ export function getSettings(lifeOS: LifeOS): UserSettings {
   }
   if (!settings.exerciseTarget) {
     settings.exerciseTarget = 7;
+  }
+  if (!settings.workoutTemplates) {
+    settings.workoutTemplates = DEFAULT_WORKOUT_TEMPLATES;
   }
   return settings;
 }
@@ -195,6 +236,9 @@ export function ensureWeekLog(lifeOS: LifeOS, weekKey?: string): LifeOS {
   }
   if (!wl.exerciseContract.completions) {
     wl.exerciseContract.completions = [];
+  }
+  if (!wl.workoutSessions) {
+    wl.workoutSessions = [];
   }
   return lifeOS;
 }
@@ -492,12 +536,22 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
         const localCompletions = localWeek.exerciseContract?.completions || [];
         const serverCompletions = serverWeek.exerciseContract?.completions || [];
         // Use whichever has more completions (most recent data)
-        const mergedCompletions = localCompletions.length >= serverCompletions.length 
-          ? localCompletions 
+        const mergedCompletions = localCompletions.length >= serverCompletions.length
+          ? localCompletions
           : serverCompletions;
-        
+
+        // Union workout sessions by id (local wins on collision) so a pull
+        // can never drop a session that was only logged on this device
+        const sessionById = new Map<string, WorkoutSession>();
+        for (const s of serverWeek.workoutSessions || []) sessionById.set(s.id, s);
+        for (const s of localWeek.workoutSessions || []) sessionById.set(s.id, s);
+        const mergedSessions = Array.from(sessionById.values()).sort(
+          (a, b) => a.completedAt - b.completedAt
+        );
+
         merged.weekLogs[key] = {
           ...serverWeek,
+          workoutSessions: mergedSessions,
           exerciseContract: {
             ...serverWeek.exerciseContract,
             completions: mergedCompletions,

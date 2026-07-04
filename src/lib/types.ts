@@ -34,6 +34,49 @@ export interface ExerciseCompletion {
   completedAt: number; // timestamp for ordering
 }
 
+// Workout types that have detailed session logging (cardio stays checkbox-only)
+export type WorkoutType = "push" | "pull" | "legs";
+
+// One logged line per exercise: summary of what was lifted
+export interface WorkoutExerciseEntry {
+  name: string;
+  kg: number | null;
+  reps: number | null;
+  sets: number | null;
+}
+
+// A completed workout with per-exercise details, linked to a slot completion
+export interface WorkoutSession {
+  id: string;
+  slotId: string; // e.g., "push-0" — pairs with ExerciseCompletion.slotId
+  type: WorkoutType;
+  completedAt: number; // timestamp, same convention as ExerciseCompletion
+  exercises: WorkoutExerciseEntry[];
+}
+
+// Template: which exercises make up a push/pull/legs day
+export interface WorkoutTemplateExercise {
+  name: string;
+  targetSets?: number;
+  targetReps?: number;
+  startKg?: number; // prefill weight until a logged session exists
+}
+
+export type WorkoutTemplates = Record<WorkoutType, WorkoutTemplateExercise[]>;
+
+// Result shape returned by /api/estimate-nutrition
+export interface NutritionEstimateItem {
+  name: string;
+  calories: number;
+  protein: number;
+}
+
+export interface NutritionEstimate {
+  calories: number;
+  protein: number;
+  items: NutritionEstimateItem[];
+}
+
 // Legacy format - kept for backwards compatibility
 export interface StrengthSessions {
   armsChest: boolean;
@@ -62,6 +105,7 @@ export interface WeekLog {
     timestamp: string | null;
   };
   exerciseContract: ExerciseContract;
+  workoutSessions?: WorkoutSession[];
 }
 
 // Weekly summary created when a week is closed out
@@ -124,6 +168,7 @@ export interface UserSettings {
   // Exercise targets - new unified model
   exerciseTarget: number; // total sessions per week (default 7)
   exerciseSlots: ExerciseSlot[]; // configurable exercise types
+  workoutTemplates?: WorkoutTemplates; // exercises per push/pull/legs day
   // Legacy exercise settings (preserved for migration)
   zone2Sessions: number;
   zone2Minutes: number;

@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DYNA OPTICS",
+  title: "DRACKER OS",
   description: "Lifestyle OS",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "DYNA OPTICS",
+    title: "DRACKER OS",
   },
 };
 

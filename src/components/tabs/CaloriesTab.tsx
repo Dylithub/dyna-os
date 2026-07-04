@@ -8,9 +8,14 @@
 // React to re-render with the new value in the input. This keeps
 // the UI and data always in sync.
 
-import type { LifeOS } from "@/lib/types";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
+import type { LifeOS, NutritionEstimate } from "@/lib/types";
+import { getTodayKey } from "@/lib/dates";
 import { getThisWeekNutrition, ensureDayLog, getSettings } from "@/lib/storage";
+import { useOnlineStatus } from "@/lib/useOnlineStatus";
 import TerminalCard from "@/components/TerminalCard";
+import TerminalButton from "@/components/TerminalButton";
 
 interface CaloriesTabProps {
   data: LifeOS;
@@ -18,6 +23,53 @@ interface CaloriesTabProps {
 }
 
 export default function CaloriesTab({ data, update }: CaloriesTabProps) {
+  const { data: session } = useSession();
+  const isOnline = useOnlineStatus();
+  const [description, setDescription] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+
+  const estimatorAvailable = Boolean(session?.user) && isOnline;
+
+  async function handleEstimate() {
+    if (!description.trim() || estimating) return;
+    setEstimating(true);
+    setEstimateError(null);
+    setEstimate(null);
+    try {
+      // Direct fetch (not apiFetch) so the route's error message reaches the UI
+      const res = await fetch("/api/estimate-nutrition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description.trim() }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setEstimateError(body?.error || `Estimation failed (${res.status})`);
+        return;
+      }
+      setEstimate(body as NutritionEstimate);
+    } catch {
+      setEstimateError("Network error — check your connection");
+    } finally {
+      setEstimating(false);
+    }
+  }
+
+  function handleAddToToday() {
+    if (!estimate) return;
+    update((current) => {
+      const todayKey = getTodayKey();
+      const updated = ensureDayLog(current, todayKey);
+      const n = updated.dayLogs[todayKey].nutrition;
+      n.calories = (n.calories ?? 0) + estimate.calories;
+      n.protein = (n.protein ?? 0) + estimate.protein;
+      return { ...updated };
+    });
+    setEstimate(null);
+    setDescription("");
+  }
   const settings = getSettings(data);
   const thisWeekNutrition = getThisWeekNutrition(data);
   const loggedDays = thisWeekNutrition.filter((d) => d.calories !== null);
@@ -87,6 +139,69 @@ export default function CaloriesTab({ data, update }: CaloriesTabProps) {
             />
           </div>
         ))}
+      </TerminalCard>
+
+      <TerminalCard title="AI ESTIMATE">
+        <div className="text-terminal-dim text-[10px] mb-2">
+          DESCRIBE A MEAL — GET KCAL + PROTEIN
+        </div>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="e.g. 200g chicken breast, rice, broccoli"
+          disabled={!estimatorAvailable || estimating}
+          className="!min-h-[70px] !text-xs mb-2"
+        />
+        {!estimatorAvailable && (
+          <div className="text-terminal-dim text-[10px] mb-2">
+            {!isOnline
+              ? "OFFLINE — estimator needs a connection. Manual entry above still works."
+              : "SIGN IN TO USE THE ESTIMATOR — manual entry above still works."}
+          </div>
+        )}
+        {estimateError && (
+          <div className="text-terminal-warning text-[10px] mb-2">{estimateError}</div>
+        )}
+        {!estimate && (
+          <TerminalButton
+            onClick={handleEstimate}
+            small
+            className={!estimatorAvailable || estimating || !description.trim() ? "opacity-50" : ""}
+          >
+            {estimating ? "ESTIMATING..." : "ESTIMATE"}
+          </TerminalButton>
+        )}
+        {estimate && (
+          <>
+            <div className="mt-1 mb-2">
+              {estimate.items.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center py-1 border-b border-terminal/10"
+                >
+                  <span className="text-terminal-dim text-xs">{item.name}</span>
+                  <span className="text-terminal text-xs">
+                    {item.calories} kcal / {item.protein}g
+                  </span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center py-1.5">
+                <span className="text-terminal-bright text-xs font-bold">TOTAL</span>
+                <span className="text-terminal-bright text-xs font-bold">
+                  {estimate.calories} kcal / {estimate.protein}g
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <TerminalButton onClick={handleAddToToday} small>
+                ADD TO TODAY
+              </TerminalButton>
+              <TerminalButton onClick={() => setEstimate(null)} small>
+                DISCARD
+              </TerminalButton>
+            </div>
+          </>
+        )}
       </TerminalCard>
 
       <TerminalCard title="WEEKLY SUMMARY">

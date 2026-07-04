@@ -85,7 +85,11 @@ export function useLifeOS() {
     (updater: (current: LifeOS) => LifeOS) => {
       setData((prev) => {
         if (!prev) return prev;
-        const next = updater(prev);
+        // Clone before applying: updaters mutate in place (ensureDayLog etc.),
+        // and React StrictMode double-invokes this function in dev — without a
+        // clone the second invocation sees already-mutated state (e.g. a
+        // toggle would apply twice and cancel itself out)
+        const next = updater(structuredClone(prev));
         const success = saveLifeOS(next);
         flashStatus(success ? "saved" : "error");
 

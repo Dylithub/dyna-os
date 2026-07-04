@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
-import type { LifeOS } from "@/lib/types";
+import type { LifeOS, UserSettings, WorkoutType, WorkoutTemplateExercise } from "@/lib/types";
 import { getTodayKey } from "@/lib/dates";
 import { exportDataToJSON, importDataFromJSON, getSettings } from "@/lib/storage";
 import { api } from "@/lib/api-client";
@@ -70,7 +70,7 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
   const weekCount = Object.keys(data.weekLogs).length;
   const settings = getSettings(data);
 
-  function updateSetting<K extends keyof typeof settings>(key: K, value: number | string | string[]) {
+  function updateSetting<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
     update((current) => ({
       ...current,
       settings: {
@@ -109,6 +109,38 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
         strengthLabels: newLabels,
       },
     }));
+  }
+
+  // ── Workout template editing ──────────────────────────────────
+  const workoutTemplates = settings.workoutTemplates!; // getSettings backfills defaults
+
+  function setTemplateExercises(type: WorkoutType, exercises: WorkoutTemplateExercise[]) {
+    updateSetting("workoutTemplates", { ...workoutTemplates, [type]: exercises });
+  }
+
+  function updateTemplateExercise(
+    type: WorkoutType,
+    index: number,
+    patch: Partial<WorkoutTemplateExercise>
+  ) {
+    const next = workoutTemplates[type].map((ex, i) =>
+      i === index ? { ...ex, ...patch } : ex
+    );
+    setTemplateExercises(type, next);
+  }
+
+  function addTemplateExercise(type: WorkoutType) {
+    setTemplateExercises(type, [
+      ...workoutTemplates[type],
+      { name: "", targetSets: 3, targetReps: 10 },
+    ]);
+  }
+
+  function removeTemplateExercise(type: WorkoutType, index: number) {
+    setTemplateExercises(
+      type,
+      workoutTemplates[type].filter((_, i) => i !== index)
+    );
   }
 
   function handleExport() {
@@ -281,6 +313,61 @@ export default function SettingsTab({ data, update }: SettingsTabProps) {
             </div>
           </>
         )}
+      </TerminalCard>
+
+      {/* Note: prefill in WorkoutMode matches exercises by name, so renaming
+          an exercise starts its progressive-overload history fresh */}
+      <TerminalCard title="WORKOUT TEMPLATES">
+        {(["push", "pull", "legs"] as WorkoutType[]).map((type) => (
+          <div key={type} className="mb-4">
+            <div className="text-terminal-dim text-[10px] mb-2 tracking-wider">
+              {type.toUpperCase()} DAY
+            </div>
+            <div className="grid grid-cols-[1fr_52px_52px_32px] gap-2 items-center mb-1">
+              <div className="text-terminal-dim text-[9px]">EXERCISE</div>
+              <div className="text-terminal-dim text-[9px]">SETS</div>
+              <div className="text-terminal-dim text-[9px]">REPS</div>
+              <div />
+            </div>
+            <div className="flex flex-col gap-2">
+              {workoutTemplates[type].map((ex, i) => (
+                <div key={i} className="grid grid-cols-[1fr_52px_52px_32px] gap-2 items-center">
+                  <input
+                    type="text"
+                    value={ex.name}
+                    placeholder="Exercise name"
+                    onChange={(e) => updateTemplateExercise(type, i, { name: e.target.value })}
+                    className="!p-2 !text-xs w-full"
+                  />
+                  <NumberInput
+                    value={ex.targetSets ?? 3}
+                    onChange={(val) => updateTemplateExercise(type, i, { targetSets: val })}
+                    className="!p-2 !text-xs w-full"
+                    min={1}
+                  />
+                  <NumberInput
+                    value={ex.targetReps ?? 10}
+                    onChange={(val) => updateTemplateExercise(type, i, { targetReps: val })}
+                    className="!p-2 !text-xs w-full"
+                    min={1}
+                  />
+                  <button
+                    onClick={() => removeTemplateExercise(type, i)}
+                    className="text-terminal-warning text-xs min-h-[32px] cursor-pointer"
+                    aria-label={`Remove ${ex.name || "exercise"}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2">
+              <TerminalButton small onClick={() => addTemplateExercise(type)}>
+                + ADD EXERCISE
+              </TerminalButton>
+            </div>
+          </div>
+        ))}
       </TerminalCard>
 
       <TerminalCard title="DATA SUMMARY">

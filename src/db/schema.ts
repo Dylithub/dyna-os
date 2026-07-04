@@ -89,6 +89,7 @@ export const weekLogs = sqliteTable(
     strengthDay3: integer("strength_core_back"),
     zone2Days: text("zone2_days"), // JSON array of day numbers, e.g. "[1,3,5,null]"
     completions: text("completions"), // JSON array of {slotId, completedAt} for new exercise model
+    workoutSessions: text("workout_sessions"), // JSON array of WorkoutSession (per-exercise kg/reps/sets)
     weighInLb: real("weigh_in_lb"),
     weighInTimestamp: text("weigh_in_timestamp"),
     updatedAt: text("updated_at")
