@@ -8,6 +8,7 @@ export interface CheckIn {
   mood: number | null;
   energy: number | null;
   stress: number | null; // "calm" in the UI, stored as "stress" for backwards compat
+  libido?: number | null; // optional: older day logs predate it
   note: string;
 }
 
@@ -124,6 +125,7 @@ export interface WeeklySummary {
   avgMood: number | null;
   avgEnergy: number | null;
   avgStress: number | null;
+  avgLibido?: number | null;
   daysWithCheckIn: number;
 
   // Exercise
@@ -177,6 +179,27 @@ export interface UserSettings {
   // Weight target
   targetWeight: number;
   targetWeightDate: string; // ISO date string (YYYY-MM-DD)
+  // Last local edit (ms) — newest copy wins when syncing between devices
+  updatedAt?: number;
+}
+
+// Weekly shopping list: items persist week to week, ticks reset each Monday
+export interface ShoppingItem {
+  id: string;
+  text: string;
+  checked: boolean;
+}
+
+export interface ShoppingSection {
+  id: string;
+  name: string;
+  items: ShoppingItem[];
+}
+
+export interface ShoppingList {
+  sections: ShoppingSection[];
+  checkedWeekKey: string; // ISO week the ticks belong to; ticks from older weeks are cleared
+  updatedAt?: number; // same newest-wins sync rule as settings
 }
 
 // Week status for tracking lifecycle
@@ -192,6 +215,7 @@ export interface LifeOS {
   };
   dailySelections: Record<string, { philosophyLine?: number }>;
   settings?: UserSettings;
+  shoppingList?: ShoppingList;
 
   // Weekly archive system
   archivedWeeks?: WeeklySummary[];

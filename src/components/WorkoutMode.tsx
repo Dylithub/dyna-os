@@ -2,9 +2,11 @@
 
 // In-workout logging view: shows the template's exercises with last session's
 // numbers for progressive overload, and inputs for today's kg/reps/sets.
-// The draft lives in local state and only enters LifeOS on FINISH.
+// The draft lives in local state and only enters LifeOS on FINISH, but is
+// mirrored to localStorage as you type so a workout survives the phone
+// closing the app mid-session (see workout-draft.ts).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   WorkoutType,
   WorkoutSession,
@@ -13,21 +15,16 @@ import type {
 } from "@/lib/types";
 import TerminalCard from "@/components/TerminalCard";
 import TerminalButton from "@/components/TerminalButton";
+import { loadWorkoutDraft, saveWorkoutDraft, type DraftRow } from "@/lib/workout-draft";
 
 interface WorkoutModeProps {
+  slotId: string;
+  weekKey: string;
   type: WorkoutType;
   template: WorkoutTemplateExercise[];
   lastSession: WorkoutSession | null;
   onFinish: (exercises: WorkoutExerciseEntry[]) => void;
   onCancel: () => void;
-}
-
-// Draft rows keep raw strings so inputs can be empty while editing
-interface DraftRow {
-  name: string;
-  kg: string;
-  reps: string;
-  sets: string;
 }
 
 function formatLast(entry: WorkoutExerciseEntry | undefined): string {
@@ -39,14 +36,19 @@ function formatLast(entry: WorkoutExerciseEntry | undefined): string {
 }
 
 export default function WorkoutMode({
+  slotId,
+  weekKey,
   type,
   template,
   lastSession,
   onFinish,
   onCancel,
 }: WorkoutModeProps) {
-  const [draft, setDraft] = useState<DraftRow[]>(() =>
-    template.map((ex) => {
+  const [draft, setDraft] = useState<DraftRow[]>(() => {
+    // Resume an unfinished workout for this slot if there is one
+    const saved = loadWorkoutDraft();
+    if (saved && saved.slotId === slotId && saved.weekKey === weekKey) return saved.rows;
+    return template.map((ex) => {
       const last = lastSession?.exercises.find((e) => e.name === ex.name);
       return {
         name: ex.name,
@@ -69,8 +71,12 @@ export default function WorkoutMode({
             ? String(ex.targetSets)
             : "",
       };
-    })
-  );
+    });
+  });
+
+  useEffect(() => {
+    saveWorkoutDraft({ slotId, weekKey, type, rows: draft });
+  }, [slotId, weekKey, type, draft]);
 
   function setField(index: number, field: "kg" | "reps" | "sets", value: string) {
     setDraft((rows) =>
@@ -92,7 +98,7 @@ export default function WorkoutMode({
     <TerminalCard title={`${type.toUpperCase()} WORKOUT — IN PROGRESS`} highlight>
       {template.length === 0 && (
         <div className="text-terminal-dim text-xs py-2">
-          No exercises in this template. Add them in SETTINGS → WORKOUT TEMPLATES.
+          No exercises in this routine. Add them with EDIT ROUTINES on the exercise tab.
         </div>
       )}
 

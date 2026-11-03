@@ -1,6 +1,6 @@
 "use client";
 
-// Daily check-in — rate mood, energy, and calm on a 1-5 scale.
+// Daily check-in — rate mood, energy, calm, and libido on a 1-5 scale.
 //
 // The scale buttons show an important React pattern: "lifting state up".
 // The button click doesn't manage its own state — it calls update()
@@ -25,7 +25,7 @@ export default function CheckInTab({ data, update }: CheckInTabProps) {
   const checkIn = data.dayLogs[todayKey]?.checkIn;
   const [noteValue, setNoteValue] = useState(checkIn?.note || "");
 
-  function setScale(field: "mood" | "energy" | "stress", value: number) {
+  function setScale(field: "mood" | "energy" | "stress" | "libido", value: number) {
     update((current) => {
       const updated = ensureDayLog(current);
       updated.dayLogs[todayKey].checkIn[field] = value;
@@ -45,6 +45,7 @@ export default function CheckInTab({ data, update }: CheckInTabProps) {
     { name: "MOOD", field: "mood" as const, value: checkIn?.mood, hint: "1 = low | 5 = great" },
     { name: "ENERGY", field: "energy" as const, value: checkIn?.energy, hint: "1 = exhausted | 5 = high" },
     { name: "CALM", field: "stress" as const, value: checkIn?.stress, hint: "1 = stressed | 5 = calm" },
+    { name: "LIBIDO", field: "libido" as const, value: checkIn?.libido, hint: "1 = low | 5 = high" },
   ];
 
   return (
@@ -83,13 +84,14 @@ export default function CheckInTab({ data, update }: CheckInTabProps) {
             { label: "MOOD", value: checkIn.mood },
             { label: "ENERGY", value: checkIn.energy },
             { label: "CALM", value: checkIn.stress },
+            { label: "LIBIDO", value: checkIn.libido },
           ].map(({ label, value }) => (
             <div
               key={label}
               className="flex justify-between items-center py-2 border-b border-terminal/10"
             >
               <span className="text-terminal-dim text-xs">{label}</span>
-              <span className="text-terminal text-xs">{value}/5</span>
+              <span className="text-terminal text-xs">{value ?? "-"}/5</span>
             </div>
           ))}
         </TerminalCard>

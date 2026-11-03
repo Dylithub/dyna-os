@@ -19,6 +19,7 @@ import WeighInTab from "@/components/tabs/WeighInTab";
 import CaloriesTab from "@/components/tabs/CaloriesTab";
 import FinancesTab from "@/components/tabs/FinancesTab";
 import CheckInTab from "@/components/tabs/CheckInTab";
+import ShoppingTab from "@/components/tabs/ShoppingTab";
 import SettingsTab from "@/components/tabs/SettingsTab";
 
 // Define our tabs — the id is internal, the label is what the user sees.
@@ -27,6 +28,7 @@ const TABS = [
   { id: "contracts", label: "EXERCISE" },
   { id: "weighin", label: "WEIGH-IN" },
   { id: "calories", label: "CALORIES" },
+  { id: "shopping", label: "SHOPPING" },
   { id: "finances", label: "FINANCES" },
   { id: "checkin", label: "CHECK-IN" },
   { id: "settings", label: "SETTINGS" },
@@ -105,6 +107,7 @@ export default function Home() {
         {activeTab === "contracts" && <ContractsTab data={data} update={update} />}
         {activeTab === "weighin" && <WeighInTab data={data} update={update} />}
         {activeTab === "calories" && <CaloriesTab data={data} update={update} />}
+        {activeTab === "shopping" && <ShoppingTab data={data} update={update} />}
         {activeTab === "finances" && <FinancesTab data={data} update={update} />}
         {activeTab === "checkin" && <CheckInTab data={data} update={update} />}
         {activeTab === "settings" && <SettingsTab data={data} update={update} />}

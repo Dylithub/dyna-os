@@ -62,9 +62,12 @@ export const dayLogs = sqliteTable(
     moodScore: integer("mood_score"),
     energyScore: integer("energy_score"),
     stressScore: integer("stress_score"),
+    libidoScore: integer("libido_score"), // added after launch — see db/ensure-schema.ts
     checkInNote: text("check_in_note").default(""),
     calories: integer("calories"),
     protein: integer("protein"),
+    spendAmount: real("spend_amount"), // added after launch — see db/ensure-schema.ts
+    todos: text("todos"), // JSON array of strings; added after launch
     updatedAt: text("updated_at")
       .notNull()
       .default(sql`(datetime('now'))`),
@@ -124,4 +127,23 @@ export const dailySelections = sqliteTable(
   (table) => [
     uniqueIndex("daily_selections_user_date").on(table.userId, table.dateKey),
   ]
+);
+
+// Whole-object client state that has no table of its own: settings (incl.
+// workout routines), the shopping list, and archived weekly summaries.
+// One JSON row per key per user.
+export const userState = sqliteTable(
+  "user_state",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(), // see USER_STATE_KEYS in lib/sync-transform.ts
+    value: text("value").notNull(), // JSON
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex("user_state_user_key").on(table.userId, table.key)]
 );

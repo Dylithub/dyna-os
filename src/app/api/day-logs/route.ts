@@ -3,11 +3,13 @@ import { db } from "@/db";
 import { dayLogs } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { ensureSchema } from "@/db/ensure-schema";
 import { getMondayOfWeek, formatDateKey } from "@/lib/dates";
 
 export async function GET(req: NextRequest) {
   const { userId, error } = await getAuthedUserId();
   if (error) return error;
+  await ensureSchema();
 
   const dateKey = req.nextUrl.searchParams.get("dateKey");
   const weekOf = req.nextUrl.searchParams.get("weekOf");
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const { userId, error } = await getAuthedUserId();
   if (error) return error;
+  await ensureSchema();
 
   const body = await req.json();
   const { dateKey, ...fields } = body;

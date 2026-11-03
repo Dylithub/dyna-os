@@ -25,6 +25,8 @@ import {
 import TerminalCard from "@/components/TerminalCard";
 import TerminalButton from "@/components/TerminalButton";
 import WorkoutMode from "@/components/WorkoutMode";
+import RoutineEditor from "@/components/RoutineEditor";
+import { loadWorkoutDraft, clearWorkoutDraft } from "@/lib/workout-draft";
 
 interface ContractsTabProps {
   data: LifeOS;
@@ -37,11 +39,21 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
   const weekLog = data.weekLogs[weekKey];
   const ec = weekLog?.exerciseContract;
 
+  // Reopen an unfinished workout from this week (e.g. the phone closed the app mid-session)
   const [activeWorkout, setActiveWorkout] = useState<{
     slotId: string;
     type: WorkoutType;
-  } | null>(null);
+  } | null>(() => {
+    const draft = loadWorkoutDraft();
+    if (!draft) return null;
+    if (draft.weekKey !== weekKey) {
+      clearWorkoutDraft(); // abandoned in an earlier week
+      return null;
+    }
+    return { slotId: draft.slotId, type: draft.type };
+  });
   const [viewingSlotId, setViewingSlotId] = useState<string | null>(null);
+  const [editingRoutines, setEditingRoutines] = useState(false);
 
   // Get completions array (use new model or empty)
   const completions: ExerciseCompletion[] = ec?.completions || [];
@@ -82,7 +94,7 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
         );
       } else {
         // ADD: Only if under max
-        if (newCompletions.length >= 7) {
+        if (newCompletions.length >= totalTarget) {
           return current; // Already at max
         }
         newCompletions.push({
@@ -121,7 +133,7 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
 
       const ec = { ...wl.exerciseContract };
       const newCompletions: ExerciseCompletion[] = [...(ec.completions || [])];
-      if (!newCompletions.some((c) => c.slotId === slotId) && newCompletions.length < 7) {
+      if (!newCompletions.some((c) => c.slotId === slotId) && newCompletions.length < totalTarget) {
         newCompletions.push({ slotId, completedAt: now });
       }
       ec.completions = newCompletions;
@@ -129,6 +141,7 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
       wl.exerciseContract = ec;
       return { ...updated };
     });
+    clearWorkoutDraft();
     setActiveWorkout(null);
   }
 
@@ -145,14 +158,31 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
           WEEKLY EXERCISE - {weekKey}
         </div>
         <WorkoutMode
+          slotId={activeWorkout.slotId}
+          weekKey={weekKey}
           type={activeWorkout.type}
           template={template}
           lastSession={lastSession}
           onFinish={(exercises) =>
             finishWorkout(activeWorkout.slotId, activeWorkout.type, exercises)
           }
-          onCancel={() => setActiveWorkout(null)}
+          onCancel={() => {
+            clearWorkoutDraft();
+            setActiveWorkout(null);
+          }}
         />
+      </>
+    );
+  }
+
+  // ── Routine editor view ──────────────────────────────────────
+  if (editingRoutines) {
+    return (
+      <>
+        <div className="text-base text-terminal-bright tracking-widest mb-4 pb-2.5 border-b border-terminal-border">
+          WEEKLY EXERCISE - {weekKey}
+        </div>
+        <RoutineEditor data={data} update={update} onDone={() => setEditingRoutines(false)} />
       </>
     );
   }
@@ -163,7 +193,11 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
         WEEKLY EXERCISE - {weekKey}
       </div>
 
-      {suggestion && totalSessions < 7 && (
+      <div className="mb-4">
+        <TerminalButton onClick={() => setEditingRoutines(true)}>✎ EDIT ROUTINES</TerminalButton>
+      </div>
+
+      {suggestion && totalSessions < totalTarget && (
         <TerminalCard title="SUGGESTED NEXT" highlight>
           <div className="flex justify-between items-center gap-2">
             <div>
@@ -229,7 +263,7 @@ export default function ContractsTab({ data, update }: ContractsTabProps) {
                   >
                     {slot.label}
                   </span>
-                  {canLogWorkout && !isDone && totalSessions < 7 && (
+                  {canLogWorkout && !isDone && totalSessions < totalTarget && (
                     <TerminalButton
                       small
                       onClick={() =>

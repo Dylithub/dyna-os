@@ -11,7 +11,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   syncPull: () =>
-    apiFetch<Omit<LifeOS, "pools">>("/api/sync"),
+    apiFetch<Omit<LifeOS, "pools">>("/api/sync", { cache: "no-store" }),
 
   syncPush: (data: LifeOS) =>
     apiFetch<{ ok: boolean }>("/api/sync", {

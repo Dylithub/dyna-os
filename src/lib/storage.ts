@@ -1,4 +1,4 @@
-import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay, UserSettings, WeeklySummary, ExerciseSlot, WorkoutTemplates, WorkoutSession } from "./types";
+import type { LifeOS, DayLog, WeekLog, WeekNutritionDay, WeekFinanceDay, UserSettings, WeeklySummary, ExerciseSlot, ExerciseCompletion, WorkoutTemplates, WorkoutSession } from "./types";
 import { getTodayKey, getISOWeekKey, getMondayOfWeek, formatDateKey, hashString } from "./dates";
 
 const STORAGE_KEY = "fitness_terminal_mobile_v1";
@@ -182,7 +182,7 @@ export function saveLifeOS(lifeOS: LifeOS): boolean {
 
 function createDefaultDayLog(): DayLog {
   return {
-    checkIn: { mood: null, energy: null, stress: null, note: "" },
+    checkIn: { mood: null, energy: null, stress: null, libido: null, note: "" },
     nutrition: { calories: null, protein: null },
     finance: { amount: null },
     todos: [],
@@ -210,7 +210,7 @@ export function ensureDayLog(lifeOS: LifeOS, dateKey?: string): LifeOS {
     lifeOS.dayLogs[key] = createDefaultDayLog();
   }
   if (!lifeOS.dayLogs[key].checkIn) {
-    lifeOS.dayLogs[key].checkIn = { mood: null, energy: null, stress: null, note: "" };
+    lifeOS.dayLogs[key].checkIn = { mood: null, energy: null, stress: null, libido: null, note: "" };
   }
   if (!lifeOS.dayLogs[key].nutrition) {
     lifeOS.dayLogs[key].nutrition = { calories: null, protein: null };
@@ -302,6 +302,7 @@ export function calculateWeeklySummary(lifeOS: LifeOS, weekKey: string): WeeklyS
   }
 
   let moodSum = 0, energySum = 0, stressSum = 0, checkInDays = 0;
+  let libidoSum = 0, libidoDays = 0;
   for (const dateKey of days) {
     const dayLog = lifeOS.dayLogs[dateKey];
     if (dayLog?.checkIn?.mood !== null && dayLog?.checkIn?.mood !== undefined) {
@@ -309,6 +310,11 @@ export function calculateWeeklySummary(lifeOS: LifeOS, weekKey: string): WeeklyS
       energySum += dayLog.checkIn.energy || 0;
       stressSum += dayLog.checkIn.stress || 0;
       checkInDays++;
+    }
+    // Averaged over the days it was actually rated (older days predate it)
+    if (dayLog?.checkIn?.libido !== null && dayLog?.checkIn?.libido !== undefined) {
+      libidoSum += dayLog.checkIn.libido;
+      libidoDays++;
     }
   }
 
@@ -352,6 +358,7 @@ export function calculateWeeklySummary(lifeOS: LifeOS, weekKey: string): WeeklyS
     avgMood: checkInDays > 0 ? Math.round((moodSum / checkInDays) * 10) / 10 : null,
     avgEnergy: checkInDays > 0 ? Math.round((energySum / checkInDays) * 10) / 10 : null,
     avgStress: checkInDays > 0 ? Math.round((stressSum / checkInDays) * 10) / 10 : null,
+    avgLibido: libidoDays > 0 ? Math.round((libidoSum / libidoDays) * 10) / 10 : null,
     daysWithCheckIn: checkInDays,
     exerciseSessionsCompleted: exerciseSessions,
     exerciseTarget: settings.exerciseTarget,
@@ -495,7 +502,7 @@ export function importDataFromJSON(jsonString: string, currentLifeOS: LifeOS): L
 
 /** Merge server data into local data. Server wins for existing records. */
 export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS {
-  const merged = { ...local };
+  const merged = structuredClone(local);
 
   if (server.dayLogs) {
     merged.dayLogs = { ...local.dayLogs };
@@ -510,6 +517,7 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
             mood: serverDay.checkIn.mood ?? localDay.checkIn.mood,
             energy: serverDay.checkIn.energy ?? localDay.checkIn.energy,
             stress: serverDay.checkIn.stress ?? localDay.checkIn.stress,
+            libido: serverDay.checkIn.libido ?? localDay.checkIn.libido ?? null,
             note: serverDay.checkIn.note || localDay.checkIn.note,
           },
           nutrition: {
@@ -519,7 +527,7 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
           finance: {
             amount: serverDay.finance?.amount ?? localDay.finance?.amount ?? null,
           },
-          todos: localDay.todos,
+          todos: serverDay.todos?.length ? serverDay.todos : localDay.todos || [],
         };
       }
     }
@@ -532,13 +540,14 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
       if (!localWeek) {
         merged.weekLogs[key] = serverWeek;
       } else {
-        // Merge weekLogs - prefer local completions if they exist, otherwise use server
-        const localCompletions = localWeek.exerciseContract?.completions || [];
-        const serverCompletions = serverWeek.exerciseContract?.completions || [];
-        // Use whichever has more completions (most recent data)
-        const mergedCompletions = localCompletions.length >= serverCompletions.length
-          ? localCompletions
-          : serverCompletions;
+        // Union completions by slot (local wins on collision), like sessions
+        // below: a session ticked on either device is never dropped
+        const completionBySlot = new Map<string, ExerciseCompletion>();
+        for (const c of serverWeek.exerciseContract?.completions || []) completionBySlot.set(c.slotId, c);
+        for (const c of localWeek.exerciseContract?.completions || []) completionBySlot.set(c.slotId, c);
+        const mergedCompletions = Array.from(completionBySlot.values()).sort(
+          (a, b) => a.completedAt - b.completedAt
+        );
 
         // Union workout sessions by id (local wins on collision) so a pull
         // can never drop a session that was only logged on this device
@@ -584,6 +593,20 @@ export function mergeData(local: LifeOS, server: Omit<LifeOS, "pools">): LifeOS 
     for (const w of (local.archivedWeeks || [])) archivedMap.set(w.weekKey, w);
     for (const w of server.archivedWeeks) archivedMap.set(w.weekKey, w);
     merged.archivedWeeks = Array.from(archivedMap.values()).sort((a, b) => b.weekKey.localeCompare(a.weekKey));
+  }
+
+  // Settings (incl. workout routines) and the shopping list are single blobs:
+  // the most recently edited copy wins, so an edit on one device reaches the others
+  if (server.settings && (server.settings.updatedAt ?? 0) > (local.settings?.updatedAt ?? 0)) {
+    merged.settings = server.settings;
+  }
+  if (server.shoppingList && (server.shoppingList.updatedAt ?? 0) > (local.shoppingList?.updatedAt ?? 0)) {
+    merged.shoppingList = server.shoppingList;
+  }
+
+  // Week keys sort chronologically: if either device has closed out a week, it stays closed
+  if (server.activeWeekKey && (!local.activeWeekKey || server.activeWeekKey > local.activeWeekKey)) {
+    merged.activeWeekKey = server.activeWeekKey;
   }
 
   merged.meta.lastOpenedAt = new Date().toISOString();

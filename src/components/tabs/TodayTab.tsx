@@ -81,7 +81,9 @@ export default function TodayTab({ data, update }: TodayTabProps) {
   let moodSum = 0,
     energySum = 0,
     stressSum = 0,
-    checkInCount = 0;
+    checkInCount = 0,
+    libidoSum = 0,
+    libidoCount = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
@@ -93,10 +95,16 @@ export default function TodayTab({ data, update }: TodayTabProps) {
       stressSum += ci.stress || 0;
       checkInCount++;
     }
+    // Averaged over the days it was rated (older days predate it)
+    if (ci && ci.libido !== null && ci.libido !== undefined) {
+      libidoSum += ci.libido;
+      libidoCount++;
+    }
   }
   const avgMood = checkInCount > 0 ? (moodSum / checkInCount).toFixed(1) : "-";
   const avgEnergy = checkInCount > 0 ? (energySum / checkInCount).toFixed(1) : "-";
   const avgStress = checkInCount > 0 ? (stressSum / checkInCount).toFixed(1) : "-";
+  const avgLibido = libidoCount > 0 ? (libidoSum / libidoCount).toFixed(1) : "-";
 
   // Check weigh-in for this week
   const weekStart = getMondayOfWeek();
@@ -194,6 +202,7 @@ export default function TodayTab({ data, update }: TodayTabProps) {
           { label: "Mood", value: avgMood },
           { label: "Energy", value: avgEnergy },
           { label: "Calm", value: avgStress },
+          { label: "Libido", value: avgLibido },
         ].map(({ label, value }) => (
           <div key={label} className="flex justify-between items-center py-2 border-b border-terminal/10">
             <span className="text-terminal-dim text-xs">{label}</span>

@@ -37,9 +37,32 @@ export function getSessionForSlot(
   return sessions.find((s) => s.slotId === slotId) ?? null;
 }
 
+// Fixed training order: the suggestion always follows on from the last P/P/L day done
+export const WORKOUT_ROTATION: WorkoutType[] = ["push", "legs", "pull"];
+
+/** Type of the most recently completed push/pull/legs slot, across all weeks */
+export function getLastCompletedWorkoutType(
+  lifeOS: LifeOS,
+  settings: UserSettings
+): WorkoutType | null {
+  const slotTypes = new Map((settings.exerciseSlots || []).map((slot) => [slot.id, slot.type]));
+  let last: { type: WorkoutType; at: number } | null = null;
+  for (const weekLog of Object.values(lifeOS.weekLogs)) {
+    for (const c of weekLog.exerciseContract?.completions || []) {
+      // Slot ids look like "push-0"; fall back to the prefix if the slot was removed
+      const type = slotTypes.get(c.slotId) ?? c.slotId.split("-")[0];
+      if (isWorkoutType(type) && (!last || c.completedAt > last.at)) {
+        last = { type, at: c.completedAt };
+      }
+    }
+  }
+  return last?.type ?? null;
+}
+
 /**
- * Suggest the next push/pull/legs workout: among types that still have an
- * uncompleted slot this week, pick the least-recently-trained (never-trained first).
+ * Suggest the next push/pull/legs workout by rotation: push → legs → pull → push…
+ * Starts from the day after the last one completed (push if none yet). If that
+ * day's slot is already done this week, moves on to the next day in the rotation.
  * Returns null when all P/P/L slots are done.
  */
 export function getSuggestedNextWorkout(
@@ -50,22 +73,20 @@ export function getSuggestedNextWorkout(
   const completions = lifeOS.weekLogs[weekKey]?.exerciseContract?.completions || [];
   const completedSlotIds = new Set(completions.map((c) => c.slotId));
 
-  let best: { type: WorkoutType; slotId: string; lastTrainedAt: number | null } | null = null;
-  for (const type of WORKOUT_TYPES) {
+  const lastType = getLastCompletedWorkoutType(lifeOS, settings);
+  const startIndex = lastType ? (WORKOUT_ROTATION.indexOf(lastType) + 1) % WORKOUT_ROTATION.length : 0;
+
+  for (let i = 0; i < WORKOUT_ROTATION.length; i++) {
+    const type = WORKOUT_ROTATION[(startIndex + i) % WORKOUT_ROTATION.length];
     const openSlot = (settings.exerciseSlots || []).find(
       (slot) => slot.type === type && !completedSlotIds.has(slot.id)
     );
-    if (!openSlot) continue;
-    const lastTrainedAt = getLastSessionOfType(lifeOS, type)?.completedAt ?? null;
-    if (
-      !best ||
-      (lastTrainedAt === null && best.lastTrainedAt !== null) ||
-      (lastTrainedAt !== null && best.lastTrainedAt !== null && lastTrainedAt < best.lastTrainedAt)
-    ) {
-      best = { type, slotId: openSlot.id, lastTrainedAt };
+    if (openSlot) {
+      const lastTrainedAt = getLastSessionOfType(lifeOS, type)?.completedAt ?? null;
+      return { type, slotId: openSlot.id, lastTrainedAt };
     }
   }
-  return best;
+  return null;
 }
 
 export function newSessionId(): string {

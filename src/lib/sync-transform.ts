@@ -1,14 +1,21 @@
 import type { LifeOS, DayLog, WeekLog, WeightEntry, WorkoutSession } from "./types";
 
+// Client fields stored whole as JSON in the user_state table
+export const USER_STATE_KEYS = ["settings", "shoppingList", "archivedWeeks", "activeWeekKey"] as const;
+export type UserStateKey = (typeof USER_STATE_KEYS)[number];
+
 // DB row types (matching Drizzle select results)
 interface DayLogRow {
   dateKey: string;
   moodScore: number | null;
   energyScore: number | null;
   stressScore: number | null;
+  libidoScore: number | null;
   checkInNote: string | null;
   calories: number | null;
   protein: number | null;
+  spendAmount: number | null;
+  todos: string | null; // JSON array of strings
   updatedAt: string;
 }
 
@@ -40,13 +47,29 @@ interface DailySelectionRow {
   philosophyLine: number | null;
 }
 
+interface UserStateRow {
+  key: string;
+  value: string; // JSON
+}
+
 // ── DB → Client ────────────────────────────────────────────────
+
+function parseTodos(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export function dbToLifeOS(
   dayLogRows: DayLogRow[],
   weekLogRows: WeekLogRow[],
   weightEntryRows: WeightEntryRow[],
   dailySelectionRows: DailySelectionRow[],
+  userStateRows: UserStateRow[] = [],
   meta?: { createdAt: string }
 ): Omit<LifeOS, "pools"> {
   const dayLogs: Record<string, DayLog> = {};
@@ -56,6 +79,7 @@ export function dbToLifeOS(
         mood: row.moodScore,
         energy: row.energyScore,
         stress: row.stressScore,
+        libido: row.libidoScore,
         note: row.checkInNote ?? "",
       },
       nutrition: {
@@ -63,9 +87,9 @@ export function dbToLifeOS(
         protein: row.protein,
       },
       finance: {
-        amount: null,
+        amount: row.spendAmount,
       },
-      todos: [],
+      todos: parseTodos(row.todos),
     };
   }
 
@@ -144,7 +168,18 @@ export function dbToLifeOS(
     };
   }
 
+  const state: Partial<Pick<LifeOS, UserStateKey>> = {};
+  for (const row of userStateRows) {
+    if (!(USER_STATE_KEYS as readonly string[]).includes(row.key)) continue;
+    try {
+      state[row.key as UserStateKey] = JSON.parse(row.value);
+    } catch {
+      // Skip a corrupt row rather than failing the whole pull
+    }
+  }
+
   return {
+    ...state,
     meta: {
       version: 2,
       createdAt: meta?.createdAt ?? new Date().toISOString(),
@@ -165,9 +200,12 @@ export function dayLogToRow(dateKey: string, dayLog: DayLog) {
     moodScore: dayLog.checkIn.mood,
     energyScore: dayLog.checkIn.energy,
     stressScore: dayLog.checkIn.stress,
+    libidoScore: dayLog.checkIn.libido ?? null,
     checkInNote: dayLog.checkIn.note,
     calories: dayLog.nutrition.calories,
     protein: dayLog.nutrition.protein,
+    spendAmount: dayLog.finance?.amount ?? null,
+    todos: dayLog.todos?.length ? JSON.stringify(dayLog.todos) : null,
     updatedAt: new Date().toISOString(),
   };
 }

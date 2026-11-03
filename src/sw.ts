@@ -1,6 +1,6 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist, NetworkFirst, ExpirationPlugin } from "serwist";
+import { Serwist, NetworkOnly } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -16,20 +16,15 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    ...defaultCache,
+    // API responses are live data and must never come from cache: a cached
+    // /api/sync pull (served on a slow or dropped connection) would merge an
+    // old snapshot over newer entries. First match wins, so this sits ahead
+    // of defaultCache, which would otherwise cache /api/ GETs for 24h.
     {
-      matcher: /\/api\/.*/,
-      handler: new NetworkFirst({
-        cacheName: "api-cache",
-        plugins: [
-          new ExpirationPlugin({
-            maxEntries: 50,
-            maxAgeSeconds: 60 * 60 * 24,
-          }),
-        ],
-        networkTimeoutSeconds: 3,
-      }),
+      matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname.startsWith("/api/"),
+      handler: new NetworkOnly(),
     },
+    ...defaultCache,
   ],
 });
 

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { dayLogs, weekLogs, weightEntries, dailySelections } from "@/db/schema";
+import { dayLogs, weekLogs, weightEntries, dailySelections, userState } from "@/db/schema";
+import { ensureSchema } from "@/db/ensure-schema";
 import { eq } from "drizzle-orm";
 import { getAuthedUserId } from "@/lib/api-auth";
-import { dbToLifeOS, dayLogToRow, weekLogToRow } from "@/lib/sync-transform";
+import { dbToLifeOS, dayLogToRow, weekLogToRow, USER_STATE_KEYS } from "@/lib/sync-transform";
 import type { LifeOS } from "@/lib/types";
 
 // GET /api/sync — Pull all user data from the server
 export async function GET() {
   const { userId, error } = await getAuthedUserId();
   if (error) return error;
+  await ensureSchema();
 
-  const [dayLogRows, weekLogRows, weightEntryRows, dailySelectionRows] =
+  const [dayLogRows, weekLogRows, weightEntryRows, dailySelectionRows, userStateRows] =
     await Promise.all([
       db.select().from(dayLogs).where(eq(dayLogs.userId, userId)),
       db.select().from(weekLogs).where(eq(weekLogs.userId, userId)),
@@ -20,13 +22,15 @@ export async function GET() {
         .select()
         .from(dailySelections)
         .where(eq(dailySelections.userId, userId)),
+      db.select().from(userState).where(eq(userState.userId, userId)),
     ]);
 
   const lifeOS = dbToLifeOS(
     dayLogRows,
     weekLogRows,
     weightEntryRows,
-    dailySelectionRows
+    dailySelectionRows,
+    userStateRows
   );
 
   return NextResponse.json(lifeOS);
@@ -36,6 +40,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const { userId, error } = await getAuthedUserId();
   if (error) return error;
+  await ensureSchema();
 
   const clientData: LifeOS = await req.json();
 
@@ -95,11 +100,26 @@ export async function POST(req: NextRequest) {
         })
   );
 
+  // Upsert settings, shopping list, and week archive as whole JSON blobs
+  const statePromises = USER_STATE_KEYS.filter((key) => clientData[key] !== undefined).map(
+    (key) => {
+      const row = { value: JSON.stringify(clientData[key]), updatedAt: new Date().toISOString() };
+      return db
+        .insert(userState)
+        .values({ userId, key, ...row })
+        .onConflictDoUpdate({
+          target: [userState.userId, userState.key],
+          set: row,
+        });
+    }
+  );
+
   await Promise.all([
     ...dayLogPromises,
     ...weekLogPromises,
     weightPromise,
     ...selectionPromises,
+    ...statePromises,
   ]);
 
   return NextResponse.json({ ok: true });
